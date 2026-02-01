@@ -12,7 +12,7 @@ namespace GodotTools.ProjectEditor
     {
         public static string GodotSdkAttrValue => $"Godot.NET.Sdk/{GeneratedGodotNupkgsVersions.GodotNETSdk}";
 
-        public static string GodotMinimumRequiredTfm => "net11.0";
+        public static string GodotMinimumRequiredTfm => "net8.0";
 
         public static ProjectRootElement GenGameProject(string name)
         {
@@ -26,7 +26,19 @@ namespace GodotTools.ProjectEditor
             var mainGroup = root.AddPropertyGroup();
             mainGroup.AddProperty("TargetFramework", GodotMinimumRequiredTfm);
 
+            // Non-gradle builds require .NET 9 to match the jar libraries included in the export template.
+            var net9 = mainGroup.AddProperty("TargetFramework", "net9.0");
+            net9.Condition = " '$(GodotTargetPlatform)' == 'android' ";
+
+            // Minimum possible version for web export.
+            var net9Web = mainGroup.AddProperty("TargetFramework", "net9.0");
+            net9Web.Condition = " '$(GodotTargetPlatform)' == 'web' ";
+
             mainGroup.AddProperty("EnableDynamicLoading", "true");
+
+            // Disable dynamic loading when building for web.
+            var dynLoad = mainGroup.AddProperty("EnableDynamicLoading", "false");
+            dynLoad.Condition = " '$(GodotTargetPlatform)' == 'web' ";
 
             string sanitizedName = IdentifierUtils.SanitizeQualifiedIdentifier(name, allowEmptyIdentifiers: true);
 
