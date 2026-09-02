@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <UseMonoRuntime>true</UseMonoRuntime>
+    <AssemblyName>GodotSharp</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+    <WasmEnableThreads>false</WasmEnableThreads>
+    <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
+    <WasmEnableSIMD>true</WasmEnableSIMD>
+  </PropertyGroup>
+  <ItemGroup>
+    <TrimmerRootAssembly Include="$(TargetName)" />
+    <TrimmerRootAssembly Include="System.Private.CoreLib" />
+  </ItemGroup>
+  <Target Name="EchoRuntimeLocation" AfterTargets="ResolveFrameworkReferences">
+    <Error Condition="'$(RuntimeIdentifier)' == ''" Message="Need to set RuntimeIdentifier to the target platform RID" />
+    <ItemGroup>
+      <ProbablyMono Include="@(ResolvedRuntimePack)" Condition="'%(ResolvedRuntimePack.FrameworkName)' == 'Microsoft.NETCore.App'" />
+    </ItemGroup>
+    <Error Condition="@(ProbablyMono->Count()) != 1" Text="Expected exactly one Microsoft.NETCore.App Mono runtime pack, got @(ProbablyMono->Count())" />
+    <PropertyGroup>
+      <LikelyMono>@(ProbablyMono)</LikelyMono>
+    </PropertyGroup>
+    <Error Condition="!$(LikelyMono.Contains('Microsoft.NETCore.App.Runtime.Mono'))" Message="Expected '@(ProbablyMono)' to include 'Microsoft.NETCore.App.Runtime.Mono' in the name." />
+    <Message Importance="High" Text="Runtime pack %(ProbablyMono.Identity) is in: %(ProbablyMono.PackageDirectory)" />
+    <WriteLinesToFile Overwrite="true" File="bin\$(RuntimeIdentifier)\runtime-pack-dir.txt" Lines="%(ProbablyMono.PackageDirectory)" />
+  </Target>
+</Project>

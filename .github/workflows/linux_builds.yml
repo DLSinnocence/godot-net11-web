@@ -161,12 +161,12 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet/sdk/*
 
-      - name: Setup older .NET SDK as baseline
+      - name: Setup .NET 11 SDK as baseline
         if: matrix.build-mono
         uses: actions/setup-dotnet@v5
         with:
           # Targeting the oldest version we want to support to ensure it still builds.
-          dotnet-version: 8.0.100
+          dotnet-version: 11.0.100-preview.7.26381.103
 
       - name: Download pre-built AccessKit
         shell: sh

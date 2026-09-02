@@ -179,7 +179,7 @@ namespace GodotTools.Export
             if (!TryDeterminePlatformFromOSName(osName, out string? platform))
                 throw new NotSupportedException("Target platform not supported.");
 
-            if (!new[] { OS.Platforms.Windows, OS.Platforms.LinuxBSD, OS.Platforms.MacOS, OS.Platforms.Android, OS.Platforms.iOS }
+            if (!new[] { OS.Platforms.Windows, OS.Platforms.LinuxBSD, OS.Platforms.MacOS, OS.Platforms.Android, OS.Platforms.iOS, OS.Platforms.Web }
                     .Contains(platform))
             {
                 throw new NotImplementedException("Target platform not yet implemented.");
@@ -195,6 +195,13 @@ namespace GodotTools.Export
                 UseTempDir = platform != OS.Platforms.iOS, // xcode project links directly to files in the publish dir, so use one that sticks around.
                 BundleOutputs = true,
             };
+
+            if (platform == OS.Platforms.Web)
+            {
+                // browser-wasm has a single architecture-independent runtime
+                // identifier and publish output.
+                publishConfig.Archs.Add("wasm32");
+            }
 
             if (features.Contains("x86_64"))
             {
@@ -242,7 +249,7 @@ namespace GodotTools.Export
 
             List<string> outputPaths = new();
 
-            bool embedBuildResults = ((bool)GetOption("dotnet/embed_build_outputs") || platform == OS.Platforms.Android) && platform != OS.Platforms.MacOS;
+            bool embedBuildResults = ((bool)GetOption("dotnet/embed_build_outputs") || platform == OS.Platforms.Android || platform == OS.Platforms.Web) && platform != OS.Platforms.MacOS;
 
             var exportedJars = new HashSet<string>();
 
@@ -349,6 +356,14 @@ namespace GodotTools.Export
                             // We get called back for both directories and files, but we only package files for now.
                             if (isFile)
                             {
+                                if (path.EndsWith(".c") || path.EndsWith(".h") || path.EndsWith(".ts") ||
+                                    path.EndsWith(".js") || path.EndsWith(".js.map") || path.EndsWith(".js.symbols") ||
+                                    path.EndsWith(".rsp") || path.EndsWith(".wasm"))
+                                {
+                                    // Browser runtime sources and native modules are linked into the Godot Web template.
+                                    return;
+                                }
+
                                 if (embedBuildResults)
                                 {
                                     if (platform == OS.Platforms.Android)
@@ -510,6 +525,7 @@ namespace GodotTools.Export
                 "arm64-v8a" => "arm64",
                 "arm32" => "arm",
                 "arm64" => "arm64",
+                "wasm32" => "wasm",
                 _ => throw new ArgumentOutOfRangeException(nameof(arch), arch, "Unexpected architecture")
             };
         }

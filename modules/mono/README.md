@@ -1,5 +1,18 @@
 # How to build and run
 
+This branch targets .NET 11. Install the .NET 11 SDK (`11.0.100-preview.7.26381.103`)
+before building the
+managed Godot assemblies or creating a C# project. Web exports use the
+`browser-wasm` runtime identifier. Web export templates embed the Mono WASM
+runtime statically and bundle the managed project assemblies into the PCK.
+
+To build a Web .NET export template, enable the module when building the
+template binary:
+
+```sh
+scons platform=web target=template_release module_mono_enabled=yes
+```
+
 1. Build Godot with the module enabled: `module_mono_enabled=yes`.
 2. After building Godot, use it to generate the C# glue code:
    ```sh

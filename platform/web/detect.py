@@ -79,6 +79,9 @@ def get_flags():
     return {
         "arch": "wasm32",
         "target": "template_debug",
+        # The Web platform supports the .NET module. Managed runtime assets
+        # are supplied by the browser-wasm publish output during export.
+        "supported": ["mono"],
         "builtin_pcre2_with_jit": False,
         "vulkan": False,
         # Embree is heavy and requires too much memory (GH-70621).
