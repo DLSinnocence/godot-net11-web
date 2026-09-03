@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <!-- .NET 11 browser-wasm uses the CoreCLR runtime pack. -->
+    <UseMonoRuntime>false</UseMonoRuntime>
     <DefineConstants>$(DefineConstants);LIBGODOT_ENABLED</DefineConstants>
 
     <_BaseLibGodotPath>$(BaseLibGodotPath)</_BaseLibGodotPath>

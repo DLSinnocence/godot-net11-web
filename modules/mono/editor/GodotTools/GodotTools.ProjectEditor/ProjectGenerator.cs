@@ -26,13 +26,12 @@ namespace GodotTools.ProjectEditor
             var mainGroup = root.AddPropertyGroup();
             mainGroup.AddProperty("TargetFramework", GodotMinimumRequiredTfm);
 
-            // Non-gradle builds require .NET 9 to match the jar libraries included in the export template.
-            var net9 = mainGroup.AddProperty("TargetFramework", "net9.0");
-            net9.Condition = " '$(GodotTargetPlatform)' == 'android' ";
+            // Mobile and web exports use the .NET 11 runtime packs in this branch.
+            var net11 = mainGroup.AddProperty("TargetFramework", "net11.0");
+            net11.Condition = " '$(GodotTargetPlatform)' == 'android' ";
 
-            // Minimum possible version for web export.
-            var net9Web = mainGroup.AddProperty("TargetFramework", "net9.0");
-            net9Web.Condition = " '$(GodotTargetPlatform)' == 'web' ";
+            var net11Web = mainGroup.AddProperty("TargetFramework", "net11.0");
+            net11Web.Condition = " '$(GodotTargetPlatform)' == 'web' ";
 
             mainGroup.AddProperty("EnableDynamicLoading", "true");
 

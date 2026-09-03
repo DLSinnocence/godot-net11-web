@@ -32,10 +32,15 @@ jobs:
             scons-flags: threads=no arch=wasm32
             artifact: true
 
-          - name: Template w/ Mono, 32-bit (target=template_release, threads=no, arch=wasm32)
-            cache-name: web-nothreads-template-mono
+          - name: Template w/ CoreCLR LibGodot, 32-bit (target=template_release, threads=no, arch=wasm32)
+            cache-name: web-nothreads-template-coreclr
             target: template_release
-            scons-flags: threads=no arch=wasm32 module_mono_enabled=yes
+            scons-flags: >-
+              threads=no
+              arch=wasm32
+              module_mono_enabled=yes
+              library_type=static_library
+              disable_crash_handler=yes
             artifact: true
 
     steps:
@@ -63,11 +68,16 @@ jobs:
       - name: Setup Python and SCons
         uses: ./.github/actions/godot-deps
 
-      - name: Setup .NET 11 SDK for Mono Web template
+      - name: Setup .NET 11 SDK for CoreCLR Web template
         if: contains(matrix.scons-flags, 'module_mono_enabled=yes')
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 11.0.100-preview.7.26381.103
+
+      - name: Install .NET WebAssembly tools
+        if: contains(matrix.scons-flags, 'module_mono_enabled=yes')
+        shell: bash
+        run: dotnet workload install wasm-tools --skip-sign-check
 
       - name: Compilation
         uses: ./.github/actions/godot-build

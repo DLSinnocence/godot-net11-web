@@ -3,14 +3,14 @@
 This branch targets .NET 11. Install the .NET 11 SDK (`11.0.100-preview.7.26381.103`)
 before building the
 managed Godot assemblies or creating a C# project. Web exports use the
-`browser-wasm` runtime identifier. Web export templates embed the Mono WASM
-runtime statically and bundle the managed project assemblies into the PCK.
+`browser-wasm` runtime identifier. Mobile and Web exports use the .NET 11
+CoreCLR-compatible runtime packs; iOS AOT support is experimental.
 
-To build a Web .NET export template, enable the module when building the
-template binary:
+To build the Web native library used by a CoreCLR browser-wasm project, enable
+the module and select a static library build:
 
 ```sh
-scons platform=web target=template_release module_mono_enabled=yes
+scons platform=web target=template_release module_mono_enabled=yes library_type=static_library
 ```
 
 1. Build Godot with the module enabled: `module_mono_enabled=yes`.

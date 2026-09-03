@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
-    <UseMonoRuntime Condition=" '$(UseMonoRuntime)' == '' and '$(PublishAot)' != 'true' ">true</UseMonoRuntime>
+    <!-- .NET 11 mobile projects use the CoreCLR runtime pack by default. -->
+    <UseMonoRuntime>false</UseMonoRuntime>
   </PropertyGroup>
 </Project>

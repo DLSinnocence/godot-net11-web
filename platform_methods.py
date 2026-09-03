@@ -174,6 +174,7 @@ def filter_file_libs(libs):
 
 
 def combine_libs_ar(target, source, env):
+    import os
     import tempfile
 
     from SCons.Script import Flatten
@@ -185,7 +186,8 @@ def combine_libs_ar(target, source, env):
         if isinstance(lib, str) and (lib.endswith(".a") or lib.endswith(".lib")):
             paths.append(lib)
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".mri", delete_on_close=False) as fp:
+    fp = tempfile.NamedTemporaryFile(mode="w", suffix=".mri", delete=False)
+    try:
         fp.write(f"create {lib_path}\n")
         for path in paths:
             fp.write(f"addlib {path}\n")
@@ -194,9 +196,14 @@ def combine_libs_ar(target, source, env):
         fp.close()
 
         env.Execute(f"$AR -M <{fp.name}")
+    finally:
+        try:
+            os.unlink(fp.name)
+        except OSError:
+            pass
 
-    # Doesn't work on web https://github.com/llvm/llvm-project/issues/50623 ,
-    # but looks like web doesn't need it? Maybe it is because it's still mono on web
+    # Doesn't work on web https://github.com/llvm/llvm-project/issues/50623;
+    # Web static archives do not need this duplicate-vtable workaround.
     if env["platform"] != "web" and env["module_mono_enabled"]:
         # Fix duplicate vtables for Object
         env.Execute(f'$OBJCOPY --redefine-sym _ZTV6Object=_ZTV6_godot_Object "{lib_path}"')
