@@ -66,8 +66,10 @@ def configure(env, env_mono):
     ]:
         add_mono_library(env, library, mono_runtime_path)
 
-    for component in ["debugger", "diagnostics_tracing", "hot_reload", "marshal-ilgen"]:
-        add_mono_component(env, component, mono_runtime_path)
+    add_mono_component(env, "debugger", mono_runtime_path)
+    add_mono_component(env, "diagnostics_tracing", mono_runtime_path, is_stub=True)
+    add_mono_component(env, "hot_reload", mono_runtime_path, is_stub=True)
+    add_mono_component(env, "marshal-ilgen", mono_runtime_path)
 
     env_thirdparty = env_mono.Clone()
     env_thirdparty.disable_warnings()
@@ -80,7 +82,15 @@ def configure(env, env_mono):
     get_runtime_pack_project_includes = os.path.join(
         get_runtime_pack_project_path, "bin", "Release", "net11.0", rid, "publish"
     )
-    env_thirdparty.Prepend(CPPPATH=get_runtime_pack_project_includes)
+    # Managed-to-native glue headers are emitted into the intermediate
+    # wasm/for-publish directory when WasmBuildNative is enabled.
+    get_runtime_pack_project_intermediate_includes = os.path.join(
+        get_runtime_pack_project_path, "obj", "Release", "net11.0", rid, "wasm", "for-publish"
+    )
+    env_thirdparty.Prepend(CPPPATH=[
+        get_runtime_pack_project_includes,
+        get_runtime_pack_project_intermediate_includes,
+    ])
     env_thirdparty.add_source_files(
         env.modules_sources,
         [
@@ -90,7 +100,7 @@ def configure(env, env_mono):
             os.path.join(mono_runtime_path, "src", "pinvoke.c"),
         ],
     )
-    env.AddJSLibraries([os.path.join(mono_runtime_path, "src", "es6", "dotnet.es6.lib.js")])
+    env.AddJSLibraries([os.path.join(mono_runtime_path, "src", "es6", "dotnet.es6.lib.js").replace("\\", "/")])
 
 
 def get_rid(platform: str, arch: str):
@@ -116,4 +126,5 @@ def add_mono_component(env, name: str, mono_runtime_path: str, is_stub: bool = F
 
 def add_mono_library(env, filename: str, mono_runtime_path: str):
     assert filename.endswith(".a")
-    env.Append(LINKFLAGS=["-Wl,-whole-archive", os.path.join(mono_runtime_path, filename), "-Wl,-no-whole-archive"])
+    library_path = os.path.join(mono_runtime_path, filename).replace("\\", "/")
+    env.Append(LINKFLAGS=["-Wl,-whole-archive", library_path, "-Wl,-no-whole-archive"])

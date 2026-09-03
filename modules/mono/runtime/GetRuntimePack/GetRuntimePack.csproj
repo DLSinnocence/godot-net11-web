@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
     <UseMonoRuntime>true</UseMonoRuntime>
+    <OutputType>Exe</OutputType>
     <AssemblyName>GodotSharp</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -9,6 +10,7 @@
     <WasmEnableThreads>false</WasmEnableThreads>
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <WasmEnableSIMD>true</WasmEnableSIMD>
+    <WasmBuildNative>true</WasmBuildNative>
   </PropertyGroup>
   <ItemGroup>
     <TrimmerRootAssembly Include="$(TargetName)" />
