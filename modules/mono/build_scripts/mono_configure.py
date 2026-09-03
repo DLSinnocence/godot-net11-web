@@ -37,12 +37,16 @@ def configure(env, env_mono):
 
     import subprocess
 
-    exit_code = subprocess.call(
-        [
-            "dotnet", "publish", get_runtime_pack_project_path,
-            "-r", rid, "--self-contained", "-c", "Release",
-        ]
-    )
+    exit_code = subprocess.call([
+        "dotnet",
+        "publish",
+        get_runtime_pack_project_path,
+        "-r",
+        rid,
+        "--self-contained",
+        "-c",
+        "Release",
+    ])
     if exit_code != 0:
         raise RuntimeError("Couldn't retrieve Mono runtime pack for '" + rid + "'.")
 
@@ -58,11 +62,19 @@ def configure(env, env_mono):
     env_mono.Append(LIBPATH=[mono_runtime_path])
 
     for library in [
-        "libmonosgen-2.0.a", "libmono-wasm-eh-wasm.a", "libmono-ee-interp.a",
-        "libSystem.Native.a", "libSystem.Globalization.Native.a",
-        "libSystem.IO.Compression.Native.a", "libSystem.Native.TimeZoneData.a",
-        "libmono-wasm-simd.a", "libmono-icall-table.a", "libicuuc.a",
-        "libicudata.a", "libicui18n.a", "libz.a",
+        "libmonosgen-2.0.a",
+        "libmono-wasm-eh-wasm.a",
+        "libmono-ee-interp.a",
+        "libSystem.Native.a",
+        "libSystem.Globalization.Native.a",
+        "libSystem.IO.Compression.Native.a",
+        "libSystem.Native.TimeZoneData.a",
+        "libmono-wasm-simd.a",
+        "libmono-icall-table.a",
+        "libicuuc.a",
+        "libicudata.a",
+        "libicui18n.a",
+        "libz.a",
     ]:
         add_mono_library(env, library, mono_runtime_path)
 
@@ -87,10 +99,12 @@ def configure(env, env_mono):
     get_runtime_pack_project_intermediate_includes = os.path.join(
         get_runtime_pack_project_path, "obj", "Release", "net11.0", rid, "wasm", "for-publish"
     )
-    env_thirdparty.Prepend(CPPPATH=[
-        get_runtime_pack_project_includes,
-        get_runtime_pack_project_intermediate_includes,
-    ])
+    env_thirdparty.Prepend(
+        CPPPATH=[
+            get_runtime_pack_project_includes,
+            get_runtime_pack_project_intermediate_includes,
+        ]
+    )
     env_thirdparty.add_source_files(
         env.modules_sources,
         [
