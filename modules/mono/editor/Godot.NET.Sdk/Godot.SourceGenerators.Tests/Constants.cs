@@ -8,10 +8,11 @@ public static class Constants
 {
     public static Assembly GodotSharpAssembly => typeof(GodotObject).Assembly;
 
-    // Can't find what needs updating to be able to access ReferenceAssemblies.Net.Net110, so we're making our own one.
+    // The analyzer testing package doesn't expose ReferenceAssemblies.Net.Net110 yet,
+    // so use the reference pack version bundled with the pinned .NET 11 preview SDK.
     public static ReferenceAssemblies Net110 => new ReferenceAssemblies(
         "net11.0",
-        new PackageIdentity("Microsoft.NETCore.App.Ref", "11.0.0"),
+        new PackageIdentity("Microsoft.NETCore.App.Ref", "11.0.0-preview.7.26381.103"),
         Path.Combine("ref", "net11.0")
     );
 
