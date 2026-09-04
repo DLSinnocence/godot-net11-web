@@ -4,6 +4,7 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Godot.Collections;
 
 
@@ -249,7 +250,7 @@ namespace Godot.NativeInterop
 
         public static godot_variant CreateFromSystemArrayOfStringName(scoped Span<StringName> from)
         {
-            if (from == default)
+            if (Unsafe.IsNullRef(ref MemoryMarshal.GetReference(from)))
                 return default;
             using var fromGodot = new Collections.Array(from);
             return CreateFromArray((godot_array)fromGodot.NativeValue);
@@ -257,7 +258,7 @@ namespace Godot.NativeInterop
 
         public static godot_variant CreateFromSystemArrayOfNodePath(scoped Span<NodePath> from)
         {
-            if (from == default)
+            if (Unsafe.IsNullRef(ref MemoryMarshal.GetReference(from)))
                 return default;
             using var fromGodot = new Collections.Array(from);
             return CreateFromArray((godot_array)fromGodot.NativeValue);
@@ -265,7 +266,7 @@ namespace Godot.NativeInterop
 
         public static godot_variant CreateFromSystemArrayOfRid(scoped Span<Rid> from)
         {
-            if (from == default)
+            if (Unsafe.IsNullRef(ref MemoryMarshal.GetReference(from)))
                 return default;
             using var fromGodot = new Collections.Array(from);
             return CreateFromArray((godot_array)fromGodot.NativeValue);
