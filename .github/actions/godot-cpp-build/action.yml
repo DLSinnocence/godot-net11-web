@@ -29,6 +29,11 @@ runs:
         ref: ${{ inputs.godot-cpp-branch }}
         path: godot-cpp
 
+    - name: Configure long archive commands
+      if: runner.os == 'Linux'
+      shell: sh
+      run: git -C godot-cpp apply "$GITHUB_ACTION_PATH/linux-response-file.patch"
+
     - name: Extract API
       shell: sh
       run: ${{ inputs.bin }} --headless --dump-gdextension-interface --dump-extension-api

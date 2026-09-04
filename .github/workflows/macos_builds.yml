@@ -8,6 +8,8 @@ env:
   SCONS_FLAGS: >-
     dev_mode=yes
     module_text_server_fb_enabled=yes
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
   build-macos:
@@ -19,16 +21,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Editor (target=editor)
+          - name: Editor w/ .NET (target=editor)
             cache-name: macos-editor
             target: editor
-            bin: ./bin/godot.macos.editor.universal
+            scons-flags: module_mono_enabled=yes
+            bin: ./bin/godot.macos.editor.universal.mono
+            binary-suffix: .mono
+            build-mono: true
 
-          - name: Template (target=template_release)
+          - name: Template w/ .NET (target=template_release)
             cache-name: macos-template
             target: template_release
-            scons-flags: debug_symbols=no
-            bin: ./bin/godot.macos.template_release.universal
+            scons-flags: module_mono_enabled=yes debug_symbols=no
+            bin: ./bin/godot.macos.template_release.universal.mono
+            binary-suffix: .mono
 
     steps:
       - name: Checkout
@@ -44,6 +50,12 @@ jobs:
 
       - name: Setup Python and SCons
         uses: ./.github/actions/godot-deps
+
+      - name: Setup .NET 11 SDK
+        if: matrix.build-mono
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.0.100-preview.7.26381.103
 
       - name: Download pre-built ANGLE
         shell: sh
@@ -100,11 +112,21 @@ jobs:
 
       - name: Prepare artifact
         run: |
-          lipo -create ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64 -output ./bin/godot.macos.${{ matrix.target }}.universal
-          rm ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64
+          lipo -create ./bin/godot.macos.${{ matrix.target }}.x86_64${{ matrix.binary-suffix }} ./bin/godot.macos.${{ matrix.target }}.arm64${{ matrix.binary-suffix }} -output ./bin/godot.macos.${{ matrix.target }}.universal${{ matrix.binary-suffix }}
+          rm ./bin/godot.macos.${{ matrix.target }}.x86_64${{ matrix.binary-suffix }} ./bin/godot.macos.${{ matrix.target }}.arm64${{ matrix.binary-suffix }}
           rm -rf ./bin/build_deps
           strip bin/godot.*
           chmod +x bin/godot.*
+
+      - name: Generate C# glue
+        if: matrix.build-mono
+        run: |
+          ${{ matrix.bin }} --headless --generate-mono-glue ./modules/mono/glue
+
+      - name: Build .NET solutions
+        if: matrix.build-mono
+        run: |
+          ./modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin --godot-platform=macos --werror
 
       - name: Upload artifact
         uses: ./.github/actions/upload-artifact

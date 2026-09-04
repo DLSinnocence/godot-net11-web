@@ -1,0 +1,16 @@
+diff --git a/tools/linux.py b/tools/linux.py
+--- a/tools/linux.py
++++ b/tools/linux.py
+@@ -20,6 +20,12 @@ def generate(env):
+         # Required for extensions to truly unload.
+         env.Append(CXXFLAGS=["-fno-gnu-unique"])
+ 
++    # The generated Godot API can contain enough object files to exceed Linux's
++    # process argument limit when creating the static godot-cpp archive.
++    # GNU ar accepts response files, so let SCons move long commands into one.
++    env["ARCOM_POSIX"] = env["ARCOM"].replace("$TARGET", "$TARGET.posix").replace("$SOURCES", "$SOURCES.posix")
++    env["ARCOM"] = "${TEMPFILE(ARCOM_POSIX)}"
++
+     env.Append(CCFLAGS=["-fPIC", "-Wwrite-strings"])
+     env.Append(LINKFLAGS=["-Wl,-R,'$$ORIGIN'"])
+ 

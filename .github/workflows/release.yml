@@ -160,8 +160,8 @@ jobs:
 
           # Use the same public asset naming convention as the official Godot
           # releases, while retaining this fork's explicitly named templates.
-          package_artifact windows-editor "Godot_v${VERSION}_win64.exe.zip"
-          package_artifact macos-editor "Godot_v${VERSION}_macos.universal.zip"
+          package_artifact windows-editor "Godot_v${VERSION}_mono_win64.zip"
+          package_artifact macos-editor "Godot_v${VERSION}_mono_macos.universal.zip"
           package_artifact linux-editor-mono "Godot_v${VERSION}_mono_linux_x86_64.zip"
 
           package_artifact windows-template "Godot_v${VERSION}_windows_template_release.zip"
