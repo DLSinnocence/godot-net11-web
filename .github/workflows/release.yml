@@ -1,0 +1,215 @@
+name: 🚀 Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the leading v (for example, 4.7.1-net11.1).
+        required: true
+        type: string
+      prerelease:
+        description: Mark the GitHub Release as a pre-release.
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: Create the GitHub Release as a draft.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release tag
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: release
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            tag="$GITHUB_REF_NAME"
+            version="${tag#v}"
+          else
+            version="$REQUESTED_VERSION"
+            tag="v$version"
+          fi
+
+          if [[ ! "$version" =~ ^[0-9A-Za-z._-]+$ ]]; then
+            echo "Release version may contain only letters, digits, dots, underscores, or hyphens." >&2
+            exit 1
+          fi
+
+          current_commit="$(git rev-parse HEAD)"
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            tag_commit="$(git rev-parse "refs/tags/$tag^{commit}")"
+            if [[ "$tag_commit" != "$current_commit" ]]; then
+              echo "Tag $tag resolves to $tag_commit, but this workflow is building $current_commit." >&2
+              exit 1
+            fi
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  static-checks:
+    name: 📊 Static checks
+    needs: prepare
+    uses: ./.github/workflows/static_checks.yml
+
+  android-build:
+    name: 🤖 Android
+    needs: static-checks
+    uses: ./.github/workflows/android_builds.yml
+    secrets:
+      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+
+  ios-build:
+    name: 🍏 iOS
+    needs: static-checks
+    uses: ./.github/workflows/ios_builds.yml
+
+  linux-build:
+    name: 🐧 Linux
+    needs: static-checks
+    uses: ./.github/workflows/linux_builds.yml
+    with:
+      changed-files: ${{ needs.static-checks.outputs.changed-files }}
+
+  macos-build:
+    name: 🍎 macOS
+    needs: static-checks
+    uses: ./.github/workflows/macos_builds.yml
+
+  windows-build:
+    name: 🏁 Windows
+    needs: static-checks
+    uses: ./.github/workflows/windows_builds.yml
+
+  web-build:
+    name: 🌐 Web
+    needs: static-checks
+    uses: ./.github/workflows/web_builds.yml
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - prepare
+      - android-build
+      - ios-build
+      - linux-build
+      - macos-build
+      - windows-build
+      - web-build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Package release assets
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release
+
+          # Artifact extraction does not retain executable permissions. Restore them
+          # before packaging the macOS and Linux binaries.
+          find artifacts -type f -name 'godot*' -exec chmod +x {} +
+
+          package_artifact() {
+            local artifact="$1"
+            local asset="$2"
+            local source="artifacts/$artifact"
+            if [[ -d "$source/bin" ]]; then
+              source="$source/bin"
+            fi
+            if [[ ! -d "$source" ]]; then
+              echo "Missing expected artifact: $artifact" >&2
+              exit 1
+            fi
+            (
+              cd "$source"
+              zip -qry "$GITHUB_WORKSPACE/release/$asset" .
+            )
+          }
+
+          # Use the same public asset naming convention as the official Godot
+          # releases, while retaining this fork's explicitly named templates.
+          package_artifact windows-editor "Godot_v${VERSION}_win64.exe.zip"
+          package_artifact macos-editor "Godot_v${VERSION}_macos.universal.zip"
+          package_artifact linux-editor-mono "Godot_v${VERSION}_mono_linux_x86_64.zip"
+
+          package_artifact windows-template "Godot_v${VERSION}_windows_template_release.zip"
+          package_artifact macos-template "Godot_v${VERSION}_macos_template_release.zip"
+          package_artifact linux-template-mono "Godot_v${VERSION}_mono_linux_x86_64_template_release.zip"
+          package_artifact linux-template-mono-debug "Godot_v${VERSION}_mono_linux_x86_64_template_debug.zip"
+          package_artifact linux-template-minimal "Godot_v${VERSION}_linux_x86_64_template_minimal.zip"
+          package_artifact android-template-arm32 "Godot_v${VERSION}_android_arm32_template_debug.zip"
+          package_artifact android-template-arm64 "Godot_v${VERSION}_android_arm64_template_debug.zip"
+          package_artifact ios-template "Godot_v${VERSION}_ios_template_release.zip"
+          package_artifact web-template "Godot_v${VERSION}_web_wasm64_template_release.zip"
+          package_artifact web-nothreads-template "Godot_v${VERSION}_web_wasm32_template_release.zip"
+          package_artifact web-nothreads-template-coreclr "Godot_v${VERSION}_mono_web_wasm32_template_release.zip"
+
+          copy_android_asset() {
+            local artifact="$1"
+            local pattern="$2"
+            local asset="$3"
+            local source
+            source="$(find "artifacts/$artifact" -type f -name "$pattern" -print -quit)"
+            if [[ -z "$source" ]]; then
+              echo "Missing expected Android asset in $artifact: $pattern" >&2
+              exit 1
+            fi
+            cp "$source" "release/$asset"
+          }
+
+          copy_android_asset android-editor '*android_editor-android-*.apk' "Godot_v${VERSION}_android_editor.apk"
+          copy_android_asset android-editor '*android_editor-android-*.aab' "Godot_v${VERSION}_android_editor.aab"
+          copy_android_asset android-editor-horizonos '*android_editor-horizonos-*.apk' "Godot_v${VERSION}_android_editor_horizonos.apk"
+          copy_android_asset android-editor-picoos '*android_editor-picoos-*.apk' "Godot_v${VERSION}_android_editor_picoos.apk"
+
+          sha512sum release/* > release/SHA512-SUMS.txt
+
+          ls -lh release
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ needs.prepare.outputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease || false }}
+          draft: ${{ inputs.draft || false }}
+          files: |
+            release/*.zip
+            release/*.apk
+            release/*.aab
+            release/SHA512-SUMS.txt
+          fail_on_unmatched_files: true
