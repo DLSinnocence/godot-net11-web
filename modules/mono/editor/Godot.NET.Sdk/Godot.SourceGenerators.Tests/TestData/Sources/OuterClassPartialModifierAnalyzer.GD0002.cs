@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 
 public class {|GD0002:OuterOuterClassPartialModifierAnalyzer|}
 {

@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 
 public partial class ExportDiagnostics_GD0102 : Node
 {

@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 
 // This works because it inherits from GodotObject.
 [GlobalClass]
