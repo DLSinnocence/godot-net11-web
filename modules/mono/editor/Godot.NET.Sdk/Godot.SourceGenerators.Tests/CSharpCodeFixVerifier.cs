@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -16,7 +16,7 @@ public static class CSharpCodeFixVerifier<TCodeFix, TAnalyzer>
     {
         public Test()
         {
-            ReferenceAssemblies = Constants.Net110;
+            ReferenceAssemblies = Constants.Net80;
             SolutionTransforms.Add((Solution solution, ProjectId projectId) =>
             {
                 Project project = solution.GetProject(projectId)!

@@ -1,2 +1,8 @@
 <Project>
+  <PropertyGroup>
+    <!-- Experimental .NET 11 mobile projects use the CoreCLR runtime pack (no NativeAOT). -->
+    <UseMonoRuntime>false</UseMonoRuntime>
+    <PublishAot>false</PublishAot>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+  </PropertyGroup>
 </Project>

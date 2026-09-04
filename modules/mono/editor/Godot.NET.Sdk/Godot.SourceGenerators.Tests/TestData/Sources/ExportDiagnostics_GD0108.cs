@@ -1,4 +1,4 @@
-using Godot;
+﻿using Godot;
 using Godot.Collections;
 
 public partial class ExportDiagnostics_GD0108 : Node

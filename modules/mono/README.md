@@ -1,10 +1,9 @@
 # How to build and run
 
-This branch targets .NET 11. Install the .NET 11 SDK (`11.0.100-preview.7.26381.103`)
-before building the
-managed Godot assemblies or creating a C# project. Web exports use the
-`browser-wasm` runtime identifier. Mobile and Web exports use the .NET 11
-CoreCLR-compatible runtime packs; iOS AOT support is experimental.
+The editor and desktop projects target .NET 8. Android, iOS, and Web export
+projects target .NET 11 and use the experimental CoreCLR runtime packs (without
+NativeAOT). Install the .NET 8 SDK for editor development; the .NET 11 preview
+SDK is required when building mobile or Web export assemblies.
 
 To build the Web native library used by a CoreCLR browser-wasm project, enable
 the module and select a static library build:

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Godot;
 
 public partial class ExportDiagnostics_GD0105 : Node

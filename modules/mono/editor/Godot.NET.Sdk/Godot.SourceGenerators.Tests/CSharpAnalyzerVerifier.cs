@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,7 +20,7 @@ public static class CSharpAnalyzerVerifier<TAnalyzer>
     {
         public Test()
         {
-            ReferenceAssemblies = Constants.Net110;
+            ReferenceAssemblies = Constants.Net80;
 
             SolutionTransforms.Add((Solution solution, ProjectId projectId) =>
             {

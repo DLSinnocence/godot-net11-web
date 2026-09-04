@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using Microsoft.CodeAnalysis.Testing;
 
@@ -8,12 +8,11 @@ public static class Constants
 {
     public static Assembly GodotSharpAssembly => typeof(GodotObject).Assembly;
 
-    // The analyzer testing package doesn't expose ReferenceAssemblies.Net.Net110 yet,
-    // so use the reference pack version bundled with the pinned .NET 11 preview SDK.
-    public static ReferenceAssemblies Net110 => new ReferenceAssemblies(
-        "net11.0",
-        new PackageIdentity("Microsoft.NETCore.App.Ref", "11.0.0-preview.7.26381.103"),
-        Path.Combine("ref", "net11.0")
+    // Keep analyzer tests aligned with the .NET 10 editor target.
+    public static ReferenceAssemblies Net80 => new ReferenceAssemblies(
+        "net8.0",
+        new PackageIdentity("Microsoft.NETCore.App.Ref", "8.0.0"),
+        Path.Combine("ref", "net8.0")
     );
 
     public static string ExecutingAssemblyPath { get; }

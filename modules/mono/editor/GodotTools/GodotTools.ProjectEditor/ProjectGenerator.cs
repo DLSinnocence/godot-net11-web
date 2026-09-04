@@ -26,9 +26,12 @@ namespace GodotTools.ProjectEditor
             var mainGroup = root.AddPropertyGroup();
             mainGroup.AddProperty("TargetFramework", GodotMinimumRequiredTfm);
 
-            // Mobile and web exports use the .NET 11 runtime packs in this branch.
-            var net11 = mainGroup.AddProperty("TargetFramework", "net11.0");
-            net11.Condition = " '$(GodotTargetPlatform)' == 'android' ";
+            // Mobile and web exports use the experimental .NET 11 CoreCLR runtime packs.
+            var net11Android = mainGroup.AddProperty("TargetFramework", "net11.0");
+            net11Android.Condition = " '$(GodotTargetPlatform)' == 'android' ";
+
+            var net11Ios = mainGroup.AddProperty("TargetFramework", "net11.0");
+            net11Ios.Condition = " '$(GodotTargetPlatform)' == 'ios' ";
 
             var net11Web = mainGroup.AddProperty("TargetFramework", "net11.0");
             net11Web.Condition = " '$(GodotTargetPlatform)' == 'web' ";

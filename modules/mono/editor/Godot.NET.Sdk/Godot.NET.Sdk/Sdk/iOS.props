@@ -1,11 +1,10 @@
 <Project>
   <PropertyGroup>
-    <!-- Experimental .NET 11 CoreCLR-compatible no-JIT mobile path. -->
+    <!-- Experimental .NET 11 CoreCLR mobile path. -->
     <UseMonoRuntime>false</UseMonoRuntime>
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
-    <PublishAot>true</PublishAot>
-    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
-    <UseNativeAOTRuntime>true</UseNativeAOTRuntime>
+    <PublishAot>false</PublishAot>
+    <UseNativeAOTRuntime>false</UseNativeAOTRuntime>
     <TrimmerSingleWarn>false</TrimmerSingleWarn>
   </PropertyGroup>
 </Project>

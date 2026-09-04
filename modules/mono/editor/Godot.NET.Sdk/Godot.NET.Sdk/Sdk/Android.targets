@@ -1,6 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <!-- .NET 11 mobile projects use the CoreCLR runtime pack by default. -->
-    <UseMonoRuntime>false</UseMonoRuntime>
-  </PropertyGroup>
-</Project>

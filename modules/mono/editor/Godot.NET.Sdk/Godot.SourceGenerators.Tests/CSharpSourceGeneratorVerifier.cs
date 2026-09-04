@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -17,7 +17,7 @@ where TSourceGenerator : ISourceGenerator, new()
     {
         public Test()
         {
-            ReferenceAssemblies = Constants.Net110;
+            ReferenceAssemblies = Constants.Net80;
 
             SolutionTransforms.Add((Solution solution, ProjectId projectId) =>
             {
