@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
   <PropertyGroup>
     <RepositoryRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', '..', '..', '..'))</RepositoryRoot>
     <LocalGodotSdkDir>$([MSBuild]::NormalizeDirectory('$(RepositoryRoot)', 'modules', 'mono', 'editor', 'Godot.NET.Sdk', 'Godot.NET.Sdk', 'Sdk'))</LocalGodotSdkDir>

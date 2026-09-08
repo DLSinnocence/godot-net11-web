@@ -16,7 +16,7 @@ This pins .NET SDK `11.0.100-preview.7.26381.103`, restores into `.artifacts/nug
 
 ## Native publish
 
-Run only after the local Web static-template build is complete. The switch is an acknowledgement gate:
+Run only after the local Web static-template build is complete. The switch is an acknowledgment gate:
 
 ```powershell
 ./publish-native.ps1 -TemplateBuildCompleted
