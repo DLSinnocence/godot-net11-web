@@ -161,12 +161,15 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet/sdk/*
 
-      - name: Setup .NET 11 SDK as baseline
+      - name: Setup .NET SDKs for the editor and export builds
         if: matrix.build-mono
         uses: actions/setup-dotnet@v5
         with:
-          # Targeting the oldest version we want to support to ensure it still builds.
-          dotnet-version: 11.0.100-preview.7.26381.103
+          # The net8.0 editor needs an SDK compatible with its stable host runtime.
+          # Keep .NET 11 for builds; Locator cannot load its MSBuild into .NET 8/9/10.
+          dotnet-version: |
+            8.0.x
+            11.0.100-preview.7.26381.103
 
       - name: Download pre-built AccessKit
         shell: sh
