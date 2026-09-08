@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>CoreCLR runtime exit probe</title>
+	<link rel="icon" href="data:,">
+</head>
+<body>
+	<pre id="status">LOADING</pre>
+	<script src="mono_bridge.js"></script>
+	<script type="module">
+		/* global Godot */
+
+		import { dotnet } from './_framework/dotnet.js';
+
+		const run = Number(sessionStorage.getItem('runtime-exit-run') || 0) + 1;
+		sessionStorage.setItem('runtime-exit-run', String(run));
+		const bridgeEnabled = new URLSearchParams(location.search).get('bridge') !== 'false';
+		const result = { run, bridgeEnabled, code: 0, settled: false, exitCodes: [], errors: [], log: [], events: [] };
+		globalThis.probe = result;
+		const render = () => {
+			document.getElementById('status').textContent = JSON.stringify(result, null, 2);
+		};
+		const recordError = (error) => {
+			result.errors.push(String(error));
+			render();
+		};
+		addEventListener('error', (event) => recordError(event.error || event.message));
+		addEventListener('unhandledrejection', (event) => recordError(event.reason));
+
+		try {
+			const response = await fetch('config.json');
+			if (!response.ok) {
+				throw new Error(`config.json: HTTP ${response.status}`);
+			}
+			const config = await response.json();
+			for (const resources of Object.values(config.resources)) {
+				for (const resource of resources) {
+					resource.resolvedUrl = new URL(resource.resolvedUrl, location.href).href;
+				}
+			}
+			dotnet.withConfig(config);
+			const module = await Godot({
+				locateFile: (name) => new URL(`_framework/${name}`, location.href).href,
+				getPreloadedWasm: () => null,
+				print: (line) => {
+					result.log.push(String(line));
+					render();
+				},
+				printErr: recordError,
+				noExitRuntime: false,
+				onExit: (code) => {
+					result.exitCodes.push(code);
+					result.events.push('onExit');
+					render();
+				},
+			});
+			result.events.push('created');
+			await module.callMain([]);
+			result.events.push('main-returned');
+			const exports = await module.getGodotSharpExports();
+			render();
+			setTimeout(() => {
+				result.events.push('native-callback-enter');
+				// Use real SDK keepalive APIs to represent an in-flight native callback.
+				module.runtimeKeepalivePush();
+				try {
+					exports.RuntimeExitProbe.Quit(bridgeEnabled);
+				} catch (error) {
+					if (!error || error.status !== 0) {
+						recordError(error);
+					}
+				} finally {
+					module.runtimeKeepalivePop();
+					result.events.push('native-callback-left');
+					render();
+				}
+				setTimeout(() => {
+					result.events.push('settled');
+					result.settled = true;
+					render();
+				}, 1000);
+			}, 0);
+		} catch (error) {
+			recordError(error);
+		}
+	</script>
+</body>
+</html>

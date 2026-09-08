@@ -68,6 +68,10 @@ jobs:
       - name: Setup Python and SCons
         uses: ./.github/actions/godot-deps
 
+      - name: Web loader and lifecycle regression tests
+        if: contains(matrix.scons-flags, 'module_mono_enabled=yes')
+        run: node --test modules/mono/tests/web/test_loader_audio.js
+
       - name: Setup .NET 11 SDK for CoreCLR Web template
         if: contains(matrix.scons-flags, 'module_mono_enabled=yes')
         uses: actions/setup-dotnet@v5

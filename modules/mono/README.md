@@ -48,6 +48,22 @@ emcc link. Build the native library with a compatible Emscripten toolchain, such
 as the one installed by the .NET WebAssembly workload used for that final link.
 Regression checks are documented in `tests/web/README.md`.
 
+## Web runtime shutdown
+
+After Godot finishes asynchronous cleanup and file synchronization, the managed
+exit callback disposes the engine and requests a deferred loader exit through the
+reserved `godot:runtime` JavaScript import. It then calls `Environment.Exit` to
+enter CoreCLR shutdown. On the next JavaScript timer turn, the owning runtime's
+public `exit` API releases its loader keepalive and completes normal zero-code
+shutdown through Emscripten and `onExit`. Godot does not reset keepalive counters
+or invoke `onExit` itself. Update the Web loader and GodotSharp source package
+together; both sides of this shutdown bridge are required.
+
+The fixed .NET 11 Preview 7 runtime takes an abort path for nonzero exit codes.
+The bridge preserves those codes, but does not turn aborts into successful
+`onExit` notifications. The `tests/web/runtime_exit` probe checks normal
+zero-code shutdown against the real runtime, separately from a full game export.
+
 # How to deal with NuGet packages
 
 We distribute the API assemblies, our source generators, and our custom

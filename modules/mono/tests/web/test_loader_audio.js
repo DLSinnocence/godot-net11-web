@@ -26,7 +26,7 @@ async function flushPromises() {
 	await Promise.resolve();
 }
 
-function loadMonoBridge() {
+function loadMonoBridge({ onPublicExit = () => {}, runMain = () => {} } = {}) {
 	const filename = path.join(root, 'modules/mono/web/mono_bridge.js');
 	const source = fs.readFileSync(filename, 'utf8')
 		.replace(
@@ -35,19 +35,34 @@ function loadMonoBridge() {
 		)
 		.concat('\nglobalThis.__Godot = Godot;\n');
 	let resourceLoader = null;
+	const moduleImports = new Map();
+	const importRegistrations = [];
+	const publicExitCalls = [];
+	const timers = [];
+	const Module = {};
 	const dotnet = {
 		create: () => Promise.resolve({
+			// Model the public API's thrown signal, not real SDK teardown or abort.
+			exit: (exitCode, reason) => {
+				publicExitCalls.push({ exitCode, reason });
+				onPublicExit(exitCode, reason);
+				throw reason;
+			},
 			getAssemblyExports: () => {},
 			getConfig: () => ({ mainAssemblyName: 'Test.dll' }),
-			Module: {},
-			runMain: () => {},
-			setModuleImports: () => {},
+			Module,
+			runMain,
+			setModuleImports: (name, imports) => {
+				importRegistrations.push({ name, imports });
+				moduleImports.set(name, imports);
+			},
 		}),
 		download: async () => {},
 		withConfig() {
 			return this;
 		},
-		withModuleConfig() {
+		withModuleConfig(moduleConfig) {
+			Object.assign(Module, moduleConfig);
 			return this;
 		},
 		withResourceLoader(loader) {
@@ -56,13 +71,32 @@ function loadMonoBridge() {
 		},
 	};
 	const context = vm.createContext({
-		__dotnetjs: { dotnet },
+		__dotnetjs: {
+			dotnet,
+			exit: () => assert.fail('Exit must use the owning RuntimeAPI, not the dotnet.js namespace.'),
+		},
+		Error,
 		Promise,
+		setTimeout: (callback, delay) => {
+			timers.push({ callback, delay });
+			return timers.length;
+		},
 	});
 	vm.runInContext(source, context, { filename });
 	return {
 		getResourceLoader: () => resourceLoader,
 		Godot: context.__Godot,
+		importRegistrations,
+		moduleImports,
+		publicExitCalls,
+		runTimers() {
+			// Drain one turn only, so recursive scheduling cannot hang the tests.
+			const pending = timers.splice(0);
+			for (const { callback } of pending) {
+				callback();
+			}
+		},
+		timers,
 	};
 }
 
@@ -75,6 +109,250 @@ test('the .NET resource loader returns the default URI for unhandled resources',
 	});
 	const defaultUri = 'https://example.test/_framework/System.Private.CoreLib.wasm';
 	assert.equal(bridge.getResourceLoader()('wasm', 'System.Private.CoreLib.wasm', defaultUri), defaultUri);
+});
+
+function createMonoModuleConfig(overrides = {}) {
+	return {
+		emscriptenPoolSize: 0,
+		getPreloadedWasm: () => null,
+		locateFile: () => 'dotnet.native.wasm',
+		...overrides,
+	};
+}
+
+function getRuntimeRequestExit(bridge) {
+	const runtimeImports = bridge.moduleImports.get('godot:runtime');
+	assert.equal(typeof runtimeImports?.requestExit, 'function', 'The bridge must register godot:runtime.requestExit.');
+	return runtimeImports.requestExit;
+}
+
+for (const exitCode of [0, 23, -7]) {
+	test(`public RuntimeAPI exit is deferred, once-only and preserves first code ${exitCode}`, async () => {
+		// Nonzero cases assert forwarding only; they do not model native onExit.
+		const events = [];
+		const bridge = loadMonoBridge({ onPublicExit: () => events.push('public-loader-exit') });
+		await bridge.Godot(createMonoModuleConfig());
+		const requestExit = getRuntimeRequestExit(bridge);
+		function managedCallback() {
+			events.push('native-cleanup');
+			requestExit(exitCode);
+			requestExit(exitCode + 1);
+			requestExit(-100);
+			assert.deepEqual(bridge.publicExitCalls, []);
+			events.push('managed-return');
+		}
+		function nativeCallback() {
+			managedCallback();
+			events.push('native-return');
+		}
+		nativeCallback();
+		const unwindEvents = ['native-cleanup', 'managed-return', 'native-return'];
+		assert.deepEqual(events, unwindEvents);
+		assert.deepEqual(bridge.timers.map(({ delay }) => delay), [0]);
+		await flushPromises();
+		assert.deepEqual(bridge.publicExitCalls, [], 'Public exit must be a timer task, not a microtask.');
+
+		assert.doesNotThrow(() => bridge.runTimers(), 'The exact Error passed to RuntimeAPI.exit must be swallowed.');
+		assert.deepEqual(events, [...unwindEvents, 'public-loader-exit']);
+		assert.equal(bridge.publicExitCalls.length, 1);
+		assert.equal(bridge.publicExitCalls[0].exitCode, exitCode);
+		assert.ok(bridge.publicExitCalls[0].reason instanceof Error);
+		assert.deepEqual(bridge.timers, []);
+
+		requestExit(0);
+		requestExit(exitCode + 2);
+		await flushPromises();
+		assert.deepEqual(bridge.timers, [], 'The once latch must remain set after public exit.');
+		assert.doesNotThrow(() => bridge.runTimers());
+		assert.equal(bridge.publicExitCalls.length, 1);
+		assert.equal(bridge.publicExitCalls[0].exitCode, exitCode);
+	});
+}
+
+test('deferred public exit rethrows unexpected errors even with the same message as its own signal', async () => {
+	let unexpectedError;
+	const bridge = loadMonoBridge({
+		onPublicExit: (exitCode, reason) => {
+			unexpectedError = new Error(reason.message);
+			throw unexpectedError;
+		},
+	});
+	await bridge.Godot(createMonoModuleConfig());
+	const requestExit = getRuntimeRequestExit(bridge);
+	requestExit(0);
+	assert.deepEqual(bridge.publicExitCalls, []);
+	assert.throws(() => bridge.runTimers(), (error) => error === unexpectedError);
+	assert.equal(bridge.publicExitCalls.length, 1);
+	assert.ok(bridge.publicExitCalls[0].reason instanceof Error);
+	assert.notEqual(unexpectedError, bridge.publicExitCalls[0].reason);
+	assert.equal(unexpectedError.message, bridge.publicExitCalls[0].reason.message);
+	assert.deepEqual(bridge.timers, []);
+});
+
+test('zero-code shutdown releases loader and native callback holds separately (mock ownership, not real SDK)', async () => {
+	// Only this zero-code mock models keepalive ownership and invokes native onExit.
+	// The real SDK's nonzero abort path is deliberately not simulated here.
+	let loaderHold = 1;
+	let nativeCallbackHold = 0;
+	const events = [];
+	const nativeExitCodes = [];
+	const exitAttempts = [];
+	const nativeOnExit = (exitCode) => {
+		events.push('native-onExit');
+		nativeExitCodes.push(exitCode);
+	};
+	function attemptNativeExit(source, exitCode) {
+		assert.equal(exitCode, 0, 'The native onExit model covers only successful, zero-code shutdown.');
+		const holds = loaderHold + nativeCallbackHold;
+		exitAttempts.push({ source, holds });
+		if (holds === 0) {
+			nativeOnExit(exitCode);
+		}
+	}
+	const bridge = loadMonoBridge({
+		onPublicExit: (exitCode) => {
+			events.push('public-loader-exit');
+			assert.equal(nativeCallbackHold, 0, 'Public exit must wait for the native callback to unwind.');
+			assert.equal(loaderHold, 1, 'Public exit may release only its own hold, once.');
+			loaderHold--;
+			attemptNativeExit('public loader exit', exitCode);
+		},
+	});
+	await bridge.Godot(createMonoModuleConfig({ onExit: nativeOnExit }));
+	const requestExit = getRuntimeRequestExit(bridge);
+	function managedCallback() {
+		events.push('native-cleanup');
+		try {
+			events.push('request-exit');
+			requestExit(0);
+			requestExit(23);
+		} finally {
+			events.push('Environment.Exit');
+			attemptNativeExit('Environment.Exit', 0);
+		}
+		assert.deepEqual(nativeExitCodes, []);
+		events.push('managed-return');
+	}
+	function nativeCallback() {
+		nativeCallbackHold++;
+		assert.equal(loaderHold + nativeCallbackHold, 2);
+		try {
+			managedCallback();
+		} finally {
+			nativeCallbackHold--;
+			events.push('native-return');
+		}
+	}
+	nativeCallback();
+	assert.deepEqual(exitAttempts, [{ source: 'Environment.Exit', holds: 2 }]);
+	assert.equal(loaderHold + nativeCallbackHold, 1);
+	await flushPromises();
+	assert.deepEqual(bridge.publicExitCalls, []);
+	assert.deepEqual(nativeExitCodes, []);
+	assert.deepEqual(bridge.timers.map(({ delay }) => delay), [0]);
+	const unwindEvents = ['native-cleanup', 'request-exit', 'Environment.Exit', 'managed-return', 'native-return'];
+	assert.deepEqual(events, unwindEvents);
+	assert.doesNotThrow(() => bridge.runTimers());
+	assert.equal(loaderHold + nativeCallbackHold, 0);
+	assert.deepEqual(exitAttempts, [
+		{ source: 'Environment.Exit', holds: 2 },
+		{ source: 'public loader exit', holds: 0 },
+	]);
+	assert.deepEqual(events, [...unwindEvents, 'public-loader-exit', 'native-onExit']);
+	assert.deepEqual(nativeExitCodes, [0]);
+	assert.equal(bridge.publicExitCalls.length, 1);
+	requestExit(-7);
+	await flushPromises();
+	assert.deepEqual(bridge.timers, []);
+	assert.doesNotThrow(() => bridge.runTimers());
+	assert.equal(bridge.publicExitCalls.length, 1);
+	assert.deepEqual(nativeExitCodes, [0]);
+});
+
+for (const result of [0, 23, -7]) {
+	test(`normal callMain return ${result} does not request shutdown`, async () => {
+		const mainResult = Promise.resolve(result);
+		const mainCalls = [];
+		const nativeExitCodes = [];
+		const bridge = loadMonoBridge({
+			runMain: (assembly, args) => {
+				mainCalls.push({ assembly, args });
+				return mainResult;
+			},
+		});
+		const Module = await bridge.Godot(createMonoModuleConfig({ onExit: (code) => nativeExitCodes.push(code) }));
+		const args = ['--headless', 'test'];
+		const returned = Module.callMain(args);
+		assert.equal(returned, mainResult);
+		assert.equal(await returned, result);
+		assert.deepEqual(mainCalls, [{ assembly: 'Test.dll', args }]);
+		await flushPromises();
+		assert.deepEqual(bridge.timers, []);
+		assert.doesNotThrow(() => bridge.runTimers());
+		assert.deepEqual(bridge.publicExitCalls, []);
+		assert.deepEqual(nativeExitCodes, []);
+	});
+}
+
+test('exit callbacks and once latches are isolated between separate bridge runtime contexts', async () => {
+	const first = loadMonoBridge();
+	await first.Godot(createMonoModuleConfig());
+	const firstRequestExit = getRuntimeRequestExit(first);
+	firstRequestExit(23);
+
+	const second = loadMonoBridge();
+	await second.Godot(createMonoModuleConfig());
+	const secondRequestExit = getRuntimeRequestExit(second);
+	assert.notEqual(firstRequestExit, secondRequestExit);
+	secondRequestExit(-7);
+	firstRequestExit(0);
+	secondRequestExit(0);
+	assert.deepEqual(first.timers.map(({ delay }) => delay), [0]);
+	assert.deepEqual(second.timers.map(({ delay }) => delay), [0]);
+	assert.deepEqual(first.publicExitCalls, []);
+	assert.deepEqual(second.publicExitCalls, []);
+
+	assert.doesNotThrow(() => second.runTimers());
+	assert.deepEqual(first.publicExitCalls, []);
+	assert.deepEqual(second.publicExitCalls.map(({ exitCode }) => exitCode), [-7]);
+	assert.equal(first.timers.length, 1);
+	assert.doesNotThrow(() => first.runTimers());
+	assert.deepEqual(first.publicExitCalls.map(({ exitCode }) => exitCode), [23]);
+	assert.deepEqual(second.publicExitCalls.map(({ exitCode }) => exitCode), [-7]);
+	assert.notEqual(first.publicExitCalls[0].reason, second.publicExitCalls[0].reason);
+	firstRequestExit(-100);
+	secondRequestExit(100);
+	await flushPromises();
+	assert.deepEqual(first.timers, []);
+	assert.deepEqual(second.timers, []);
+	assert.equal(first.publicExitCalls.length, 1);
+	assert.equal(second.publicExitCalls.length, 1);
+});
+
+test('user imports are registered before the reserved runtime module and cannot replace requestExit', async () => {
+	const userRequestExit = () => assert.fail('The user must not replace the reserved runtime exit callback.');
+	const userImports = {
+		'example:before': { ping: () => 'pong' },
+		'godot:runtime': { requestExit: userRequestExit },
+		'example:after': { value: 42 },
+	};
+	const bridge = loadMonoBridge();
+	await bridge.Godot(createMonoModuleConfig({ godotSharpImports: userImports }));
+	assert.deepEqual(bridge.importRegistrations.map(({ name }) => name), [
+		'example:before', 'godot:runtime', 'example:after', 'godot:runtime',
+	]);
+	assert.deepEqual(bridge.importRegistrations.slice(0, 3), Object.entries(userImports).map(([name, imports]) => ({ name, imports })));
+	assert.equal(bridge.moduleImports.get('example:before'), userImports['example:before']);
+	assert.equal(bridge.moduleImports.get('example:after'), userImports['example:after']);
+	const requestExit = getRuntimeRequestExit(bridge);
+	assert.notEqual(requestExit, userRequestExit);
+	assert.equal(userImports['godot:runtime'].requestExit, userRequestExit);
+	requestExit(23);
+	assert.deepEqual(bridge.publicExitCalls, []);
+	assert.deepEqual(bridge.timers.map(({ delay }) => delay), [0]);
+	assert.doesNotThrow(() => bridge.runTimers());
+	assert.deepEqual(bridge.publicExitCalls.map(({ exitCode }) => exitCode), [23]);
+	assert.deepEqual(bridge.timers, []);
 });
 
 function createAudioHarness() {

@@ -13,9 +13,15 @@ dotnet build modules/mono/tests/web/test_shutdown.csproj -r browser-wasm --self-
 
 The managed tests check aggregate-return lowering, scalar return widths,
 trampoline signatures, and ABI-version rejection. The JavaScript tests exercise
-loader defaults and delayed audio initialization during shutdown and restart.
+loader defaults, deferred public runtime exit, and delayed audio initialization
+during shutdown and restart. The CoreCLR Web CI job runs these JavaScript checks.
 The shutdown project compiles the production browser entry point with test
 stubs and checks its shutdown contract; it is not a browser execution test.
+
+`runtime_exit/` is a separate browser probe using the unmodified, prebuilt .NET
+runtime and the production Godot loader. It compares native `Environment.Exit(0)`
+alone with the deferred loader exit, then checks page reload. It avoids native
+Godot relinking and does not replace the full game smoke test below.
 
 After building GodotSharp, run the installed SDK's real managed-to-native
 generator. Set `WasmSdkDir` to the versioned `Microsoft.NET.Runtime.WebAssembly.Sdk`

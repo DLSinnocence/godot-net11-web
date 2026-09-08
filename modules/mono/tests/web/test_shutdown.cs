@@ -16,6 +16,7 @@ namespace GodotWebShutdownTests
             string source = File.ReadAllText(args[0]);
 
             AssertAbsent(source, "emscripten_force_exit");
+            AssertOrdered(source, "[JSImport(\"requestExit\", \"godot:runtime\")]", "private static partial void RequestRuntimeExit(int exitCode);");
             AssertOrdered(
                 source,
                 "private static void ExitCallback()",
@@ -24,7 +25,10 @@ namespace GodotWebShutdownTests
                 "emscripten_cancel_main_loop();",
                 "instance = null;",
                 "currentInstance?.Dispose();",
-                "Environment.Exit(Environment.ExitCode);");
+                "int exitCode = Environment.ExitCode;",
+                "RequestRuntimeExit(exitCode);",
+                "finally",
+                "Environment.Exit(exitCode);");
             AssertOrdered(
                 source,
                 "private static unsafe void SetupExit()",

@@ -74,7 +74,7 @@ const Godot = async (moduleConfig) => { // eslint-disable-line no-unused-vars
 		});
 
 	await dotnet.download();
-	const { setModuleImports, getAssemblyExports, getConfig, runMain, Module } = await dotnet.create();
+	const { setModuleImports, getAssemblyExports, getConfig, runMain, exit, Module } = await dotnet.create();
 
 	const dotnetConfig = getConfig();
 
@@ -84,6 +84,28 @@ const Godot = async (moduleConfig) => { // eslint-disable-line no-unused-vars
 			setModuleImports(moduleName, moduleImports[moduleName]);
 		}
 	}
+	let runtimeExitRequested = false;
+	setModuleImports('godot:runtime', {
+		requestExit: (exitCode) => {
+			if (runtimeExitRequested) {
+				return;
+			}
+			runtimeExitRequested = true;
+			// Let Environment.Exit and the native callback unwind before the loader
+			// releases its own keepalive. Do not use an Emscripten-owned timer here.
+			globalThis.setTimeout(() => {
+				const reason = new Error('Godot runtime shutdown');
+				try {
+					exit(exitCode, reason);
+				} catch (error) {
+					// The public loader API throws the supplied reason even on success.
+					if (error !== reason) {
+						throw error;
+					}
+				}
+			}, 0);
+		},
+	});
 	Module['getGodotSharpExports'] = getAssemblyExports.bind(null, dotnetConfig.mainAssemblyName);
 
 	// As "callMain" is missing, we can create custom replacement,

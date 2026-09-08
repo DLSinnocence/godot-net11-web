@@ -79,6 +79,9 @@ namespace GodotPlugins.Game
         [DllImport("*")]
         private static unsafe extern void godot_js_os_finish_async(nint func);
 
+        [JSImport("requestExit", "godot:runtime")]
+        private static partial void RequestRuntimeExit(int exitCode);
+
         // Custom web iteration.
         [LibraryImport("libgodot")]
         private static partial byte libgodot_web_iteration();
@@ -108,8 +111,17 @@ namespace GodotPlugins.Game
             }
             finally
             {
-                // Enter CoreCLR shutdown even if native cleanup fails, preserving the latched exit code.
-                Environment.Exit(Environment.ExitCode);
+                int exitCode = Environment.ExitCode;
+                try
+                {
+                    // The loader owns a keepalive that native Environment.Exit cannot release.
+                    RequestRuntimeExit(exitCode);
+                }
+                finally
+                {
+                    // Set CoreCLR shutdown state before the deferred loader exit runs.
+                    Environment.Exit(exitCode);
+                }
             }
         }
 
