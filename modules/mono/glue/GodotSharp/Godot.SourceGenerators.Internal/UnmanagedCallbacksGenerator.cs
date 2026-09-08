@@ -156,6 +156,14 @@ using Godot.NativeInterop;
             methodCallArguments.Clear();
             methodSourceAfterCall.Clear();
 
+            bool returnViaOut = ReturnsViaOutParameter(callback);
+            string returnVariable = "ret";
+            while (callback.Parameters.Any(p => p.Name == returnVariable ||
+                p.Name + "_copy" == returnVariable || p.Name + "_ptr" == returnVariable))
+            {
+                returnVariable += "_";
+            }
+
             source.Append("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]\n");
             source.Append($"    {SyntaxFacts.GetText(callback.DeclaredAccessibility)} ");
 
@@ -229,12 +237,21 @@ using Godot.NativeInterop;
             source.Append("    {\n");
 
             source.Append(methodSource);
+
+            if (returnViaOut)
+            {
+                source.Append($"        {callback.ReturnType.FullQualifiedNameIncludeGlobal()} {returnVariable} = default;\n");
+                if (callback.Parameters.Length != 0)
+                    methodCallArguments.Append(", ");
+                methodCallArguments.Append('&').Append(returnVariable);
+            }
+
             source.Append("        ");
 
-            if (!callback.ReturnsVoid)
+            if (!callback.ReturnsVoid && !returnViaOut)
             {
                 if (methodSourceAfterCall.Length != 0)
-                    source.Append($"{callback.ReturnType.FullQualifiedNameIncludeGlobal()} ret = ");
+                    source.Append($"{callback.ReturnType.FullQualifiedNameIncludeGlobal()} {returnVariable} = ");
                 else
                     source.Append("return ");
             }
@@ -243,13 +260,10 @@ using Godot.NativeInterop;
             source.Append(methodCallArguments);
             source.Append(");\n");
 
-            if (methodSourceAfterCall.Length != 0)
-            {
-                source.Append(methodSourceAfterCall);
+            source.Append(methodSourceAfterCall);
 
-                if (!callback.ReturnsVoid)
-                    source.Append("        return ret;\n");
-            }
+            if (!callback.ReturnsVoid && (returnViaOut || methodSourceAfterCall.Length != 0))
+                source.Append($"        return {returnVariable};\n");
 
             source.Append("    }\n\n");
         }
@@ -359,8 +373,46 @@ using Godot.NativeInterop;
                 source.Append(", ");
             }
 
-            source.Append(callback.ReturnType.FullQualifiedNameIncludeGlobal());
+            if (ReturnsViaOutParameter(callback))
+            {
+                AppendPointerType(source, callback.ReturnType);
+                source.Append(", void");
+            }
+            else
+            {
+                source.Append(callback.ReturnType.FullQualifiedNameIncludeGlobal());
+            }
             source.Append($"> {callback.Name};\n");
+
+            // Wasm's managed-to-native generator discovers delegates but can miss calli signatures.
+            source.Append("\n    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]\n");
+            source.Append("    private delegate ");
+            if (ReturnsViaOutParameter(callback))
+                source.Append("void");
+            else
+                AppendTrampolineType(source, callback.ReturnType);
+            source.Append($" {callback.Name}Trampoline(");
+
+            for (int i = 0; i < callback.Parameters.Length; i++)
+            {
+                if (i != 0)
+                    source.Append(", ");
+
+                var parameter = callback.Parameters[i];
+                if (IsByRefParameter(parameter))
+                    source.Append("global::System.IntPtr");
+                else
+                    AppendTrampolineType(source, parameter.Type);
+                source.Append($" arg{i}");
+            }
+
+            if (ReturnsViaOutParameter(callback))
+            {
+                if (callback.Parameters.Length != 0)
+                    source.Append(", ");
+                source.Append("global::System.IntPtr result");
+            }
+            source.Append(");\n\n");
         }
 
         source.Append("}\n");
@@ -384,6 +436,26 @@ using Godot.NativeInterop;
 
         context.AddSource($"{symbol.FullQualifiedNameOmitGlobal().SanitizeQualifiedNameForUniqueHint()}.generated",
             SourceText.From(source.ToString(), Encoding.UTF8));
+    }
+
+    // Opaque native storage and managed fields may have different aggregate-return ABIs.
+    // Keep the managed API, but pass an explicit trailing output pointer across the boundary.
+    private static bool ReturnsViaOutParameter(IMethodSymbol method) =>
+        method.ReturnType.TypeKind == TypeKind.Struct && method.ReturnType.SpecialType is not (
+            SpecialType.System_Void or SpecialType.System_Boolean or SpecialType.System_Char or
+            SpecialType.System_SByte or SpecialType.System_Byte or
+            SpecialType.System_Int16 or SpecialType.System_UInt16 or
+            SpecialType.System_Int32 or SpecialType.System_UInt32 or
+            SpecialType.System_Int64 or SpecialType.System_UInt64 or
+            SpecialType.System_Single or SpecialType.System_Double or
+            SpecialType.System_IntPtr or SpecialType.System_UIntPtr);
+
+    private static void AppendTrampolineType(StringBuilder source, ITypeSymbol type)
+    {
+        // MetadataLoadContext in the Wasm SDK cannot decode nested function-pointer signatures.
+        source.Append(type.TypeKind is TypeKind.Pointer or TypeKind.FunctionPointer
+            ? "global::System.IntPtr"
+            : type.FullQualifiedNameIncludeGlobal());
     }
 
     private static bool IsGodotInteropStruct(ITypeSymbol type) =>

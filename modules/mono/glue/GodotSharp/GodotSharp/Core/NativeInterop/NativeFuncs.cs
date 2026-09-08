@@ -18,6 +18,8 @@ namespace Godot.NativeInterop
     [GenerateUnmanagedCallbacks(typeof(UnmanagedCallbacks))]
     public static unsafe partial class NativeFuncs
     {
+        // Must match godotsharp_get_runtime_interop_abi_version in runtime_interop.cpp.
+        private const int RuntimeInteropAbiVersion = 1;
         private static bool initialized;
 
         // ReSharper disable once ParameterOnlyUsedForPreconditionCheck.Global
@@ -25,12 +27,20 @@ namespace Godot.NativeInterop
         {
             if (initialized)
                 throw new InvalidOperationException("Already initialized.");
-            initialized = true;
 
             if (unmanagedCallbacksSize != sizeof(UnmanagedCallbacks))
-                throw new ArgumentException("Unmanaged callbacks size mismatch.", nameof(unmanagedCallbacksSize));
+                throw new ArgumentException("Unmanaged callbacks size mismatch. Rebuild the Godot engine and GodotSharp together.", nameof(unmanagedCallbacksSize));
 
-            _unmanagedCallbacks = Unsafe.AsRef<UnmanagedCallbacks>((void*)unmanagedCallbacks);
+            if (unmanagedCallbacks == IntPtr.Zero)
+                throw new ArgumentNullException(nameof(unmanagedCallbacks));
+
+            var callbacks = Unsafe.AsRef<UnmanagedCallbacks>((void*)unmanagedCallbacks);
+            if (callbacks.godotsharp_get_runtime_interop_abi_version == null ||
+                callbacks.godotsharp_get_runtime_interop_abi_version() != RuntimeInteropAbiVersion)
+                throw new InvalidOperationException("Runtime interop ABI version mismatch. Rebuild the Godot engine and GodotSharp together.");
+
+            _unmanagedCallbacks = callbacks;
+            initialized = true;
         }
 
         private partial struct UnmanagedCallbacks
@@ -38,6 +48,9 @@ namespace Godot.NativeInterop
         }
 
         // Custom functions
+
+        // This fixed first slot must keep its position and signature across ABI revisions.
+        internal static partial int godotsharp_get_runtime_interop_abi_version();
 
         internal static partial godot_bool godotsharp_dotnet_module_is_initialized();
 
@@ -53,7 +66,7 @@ namespace Godot.NativeInterop
         public static partial IntPtr godotsharp_engine_get_singleton(in godot_string p_name);
 
 
-        internal static partial Error godotsharp_stack_info_vector_resize(
+        internal static partial int godotsharp_stack_info_vector_resize(
             ref DebuggingUtils.godot_stack_info_vector p_stack_info_vector, int p_size);
 
         internal static partial void godotsharp_stack_info_vector_destroy(
@@ -74,7 +87,7 @@ namespace Godot.NativeInterop
         internal static partial void godotsharp_internal_refcounted_disposed(IntPtr ptr, IntPtr gcHandleToFree,
             godot_bool isFinalizer);
 
-        internal static partial Error godotsharp_internal_signal_awaiter_connect(IntPtr source,
+        internal static partial int godotsharp_internal_signal_awaiter_connect(IntPtr source,
             in godot_string_name signal,
             IntPtr target, IntPtr awaiterHandlePtr);
 
@@ -420,7 +433,7 @@ namespace Godot.NativeInterop
 
         public static partial void godotsharp_array_remove_at(ref godot_array p_self, int p_index);
 
-        public static partial Error godotsharp_array_resize(ref godot_array p_self, int p_new_size);
+        public static partial int godotsharp_array_resize(ref godot_array p_self, int p_new_size);
 
         public static partial void godotsharp_array_reverse(ref godot_array p_self);
 
@@ -632,5 +645,6 @@ namespace Godot.NativeInterop
         public static partial long godotsharp_packed_color_array_size(in godot_packed_color_array p_self);
 
         public static partial long godotsharp_array_size(in godot_array p_self);
+
     }
 }

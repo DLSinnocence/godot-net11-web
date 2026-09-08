@@ -1,0 +1,40 @@
+<Project DefaultTargets="Verify">
+  <PropertyGroup>
+    <GodotSharpAssembly Condition="'$(GodotSharpAssembly)' == ''">$(MSBuildThisFileDirectory)../../glue/GodotSharp/GodotSharp/bin/Debug/GodotSharp.dll</GodotSharpAssembly>
+    <OutputDir>$(MSBuildThisFileDirectory)obj/interop/</OutputDir>
+  </PropertyGroup>
+
+  <UsingTask TaskName="Microsoft.WebAssembly.Build.Tasks.CoreClr.ManagedToNativeGenerator"
+    AssemblyFile="$(WasmSdkDir)/tasks/net11.0/WasmAppBuilder.dll" />
+
+  <Target Name="Verify">
+    <Error Condition="!Exists('$(WasmSdkDir)/tasks/net11.0/WasmAppBuilder.dll')"
+      Text="Pass WasmSdkDir pointing to the installed .NET 11 WebAssembly SDK pack." />
+    <Error Condition="!Exists('$(WasmRuntimeDir)/native/System.Private.CoreLib.dll') and !Exists('$(WasmRuntimeDir)/lib/net11.0/System.Private.CoreLib.dll')"
+      Text="Pass WasmRuntimeDir pointing to runtimes/browser-wasm in the CoreCLR runtime pack." />
+    <Error Condition="!Exists('$(GodotSharpAssembly)')" Text="Build GodotSharp before running this verification." />
+    <MakeDir Directories="$(OutputDir)" />
+    <ItemGroup>
+      <ManagedAssembly Include="$(WasmRuntimeDir)/lib/net11.0/*.dll" />
+      <ManagedAssembly Include="$(WasmRuntimeDir)/native/System.Private.CoreLib.dll"
+        Condition="Exists('$(WasmRuntimeDir)/native/System.Private.CoreLib.dll')" />
+      <ManagedAssembly Include="$(GodotSharpAssembly)" />
+    </ItemGroup>
+    <ManagedToNativeGenerator
+      Assemblies="@(ManagedAssembly)"
+      PInvokeModules="libSystem.Native;libSystem.IO.Compression.Native;libSystem.Globalization.Native;libSystem.Native.Browser;libSystem.Runtime.InteropServices.JavaScript.Native"
+      PInvokeOutputPath="$(OutputDir)callhelpers-pinvoke.cpp"
+      ReversePInvokeOutputPath="$(OutputDir)callhelpers-reverse.cpp"
+      InterpToNativeOutputPath="$(OutputDir)callhelpers-interp-to-managed.cpp"
+      CacheFilePath="$(OutputDir)m2n_cache.txt"
+      TargetOS="browser"
+      IsLibraryMode="true" />
+    <PropertyGroup>
+      <GeneratedHelpers>$([System.IO.File]::ReadAllText('$(OutputDir)callhelpers-interp-to-managed.cpp'))</GeneratedHelpers>
+    </PropertyGroup>
+    <Error Condition="!$(GeneratedHelpers.Contains('Mvffffi'))" Text="Missing Color output-pointer trampoline." />
+    <Error Condition="!$(GeneratedHelpers.Contains('Miii'))" Text="Missing int32 stack-info resize trampoline." />
+    <Error Condition="!$(GeneratedHelpers.Contains('Mviii'))" Text="Missing packed-array output-pointer trampoline." />
+    <Message Importance="High" Text="CoreCLR Wasm call helpers generated with the Color, stack-info, and packed-array ABI signatures." />
+  </Target>
+</Project>

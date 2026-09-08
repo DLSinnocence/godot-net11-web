@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <RuntimeIdentifiers>browser-wasm</RuntimeIdentifiers>
+    <OutputType>Exe</OutputType>
+    <StartupObject>GodotWebShutdownTests.Program</StartupObject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>enable</Nullable>
+    <DefineConstants>LIBGODOT_ENABLED;GODOT_WEB;TOOLS</DefineConstants>
+    <UseMonoRuntime>false</UseMonoRuntime>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="test_shutdown.cs" />
+    <Compile Include="../../glue/GodotSharp/GodotSharp/SourceFiles/LibGodotMain.cs" Link="LibGodotMain.cs" />
+  </ItemGroup>
+</Project>

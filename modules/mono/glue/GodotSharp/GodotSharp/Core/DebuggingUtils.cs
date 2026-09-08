@@ -89,7 +89,7 @@ namespace Godot
             {
                 ArgumentOutOfRangeException.ThrowIfNegative(size);
 
-                var err = NativeFuncs.godotsharp_stack_info_vector_resize(ref this, size);
+                var err = (Error)NativeFuncs.godotsharp_stack_info_vector_resize(ref this, size);
                 if (err != Error.Ok)
                     throw new InvalidOperationException("Failed to resize vector. Error code is: " + err.ToString());
             }

@@ -28,6 +28,9 @@
     <_GodotJsLibraries Include="$(_BaseLibGodotPath)\js_library\**\*.js" />
     <_GodotPreJs Include="$(_BaseLibGodotPath)\pre_js\**\*.js" />
     <_GodotPostJs Include="$(_BaseLibGodotPath)\post_js\**\*.js" />
+
+    <!-- Normalize legacy WebAssembly EH instructions in the final emcc-linked module. -->
+    <GodotEmccExtraLDFlag Include="-s BINARYEN_EXTRA_PASSES=translate-to-exnref" />
   </ItemGroup>
 
   <Choose>

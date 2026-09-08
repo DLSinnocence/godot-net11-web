@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 #if GODOT_WEB
 using System.Runtime.InteropServices.JavaScript;
@@ -73,8 +74,6 @@ namespace GodotPlugins.Game
         // private static extern byte emscripten_is_main_browser_thread();
         [DllImport("*")]
         private static extern void emscripten_cancel_main_loop();
-        [DllImport("*")]
-        private static extern void emscripten_force_exit(int status);
 
         // Load godot js libraries.
         [DllImport("*")]
@@ -85,35 +84,49 @@ namespace GodotPlugins.Game
         private static partial byte libgodot_web_iteration();
 
         private static GodotInstance? instance = null;
-        private static bool shutdownComplete = false;
+        private static int shutdownStarted = 0;
+        private static int shutdownSyncComplete = 0;
+        private static int runtimeExitStarted = 0;
 
         [UnmanagedCallersOnly]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ExitCallback()
         {
-            if (!shutdownComplete)
+            if (Volatile.Read(ref shutdownSyncComplete) == 0 ||
+                Interlocked.Exchange(ref runtimeExitStarted, 1) != 0)
             {
-                return; // Still waiting.
+                return;
             }
-            if (instance is not null)
-            {
-                // Console.WriteLine("LibGodot before destroy");
-                instance.Dispose();
-                instance = null;
-            }
+
             emscripten_cancel_main_loop();
-            emscripten_force_exit(0);
+
+            GodotInstance? currentInstance = instance;
+            instance = null;
+            try
+            {
+                currentInstance?.Dispose();
+            }
+            finally
+            {
+                // Enter CoreCLR shutdown even if native cleanup fails, preserving the latched exit code.
+                Environment.Exit(Environment.ExitCode);
+            }
         }
 
         [UnmanagedCallersOnly]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void CleanupAfterSync()
         {
-            shutdownComplete = true;
+            Volatile.Write(ref shutdownSyncComplete, 1);
         }
 
         private static unsafe void SetupExit()
         {
+            if (Interlocked.Exchange(ref shutdownStarted, 1) != 0)
+            {
+                return;
+            }
+
             emscripten_cancel_main_loop();
             emscripten_set_main_loop((nint)(delegate* unmanaged<void>)&ExitCallback, -1, 0);
             godot_js_os_finish_async((nint)(delegate* unmanaged<void>)&CleanupAfterSync);
@@ -124,6 +137,11 @@ namespace GodotPlugins.Game
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void MainLoopCallback()
         {
+            if (Volatile.Read(ref shutdownStarted) != 0)
+            {
+                return;
+            }
+
             if (libgodot_web_iteration() != 0)
             {
                 SetupExit();

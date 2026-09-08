@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Godot Web CoreCLR Smoke</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; background: #111; color: #eee; font: 14px monospace; }
+    body { display: grid; grid-template-rows: 1fr auto; }
+    canvas { width: 100%; height: 100%; outline: none; }
+    #result { padding: 8px 12px; background: #1b1b1b; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" tabindex="0"></canvas>
+  <div id="result" role="status">SMOKE:LOADING</div>
+  <script>
+    const run = Number(sessionStorage.getItem('godot-smoke-run') || '0') + 1;
+    sessionStorage.setItem('godot-smoke-run', String(run));
+
+    const result = document.getElementById('result');
+    const messages = [];
+    let failed = false;
+    let exitTimer;
+    document.body.dataset.smokeStatus = 'LOADING';
+    document.body.dataset.smokeRun = String(run);
+    const record = (...parts) => {
+      const text = parts.map(String).join(' ');
+      messages.push(text);
+      console.log(text);
+    };
+    const recordError = (...parts) => {
+      const text = parts.map(String).join(' ');
+      messages.push(text);
+      console.error(text);
+    };
+
+    const finish = (status, detail) => {
+      result.textContent = `SMOKE:${status}:RUN=${run}:${detail}\n${messages.join('\n')}`;
+      document.body.dataset.smokeStatus = status;
+    };
+    const fail = (detail, error) => {
+      failed = true;
+      clearTimeout(exitTimer);
+      recordError(error && error.stack ? error.stack : error);
+      finish('FAIL', detail);
+    };
+
+    // Register before loading the engine so loader errors are captured too.
+    window.addEventListener('error', (event) => {
+      fail('PAGEERROR', event.error || event.message || 'Script or resource load failed.');
+    }, true);
+    window.addEventListener('unhandledrejection', (event) => {
+      fail('UNHANDLEDREJECTION', event.reason);
+    });
+  </script>
+  <script src="smoke.js"></script>
+  <script>
+
+    const engine = new Engine({
+      canvas: document.getElementById('canvas'),
+      executable: 'smoke',
+      mainPack: 'smoke.pck',
+      unloadAfterInit: false,
+      onPrint: record,
+      onPrintError: recordError,
+      onExit: (code) => {
+        if (failed) { return; }
+        clearTimeout(exitTimer);
+        document.body.dataset.smokeStatus = 'SETTLING';
+        // Audio startup and shutdown callbacks may trap after onExit returns.
+        exitTimer = setTimeout(() => {
+          if (failed) { return; }
+          const output = messages.join('\n');
+          const checks = [
+            code === 0,
+            output.includes('SMOKE:PASS'),
+            output.includes('SMOKE:AUDIO_DRIVER='),
+            output.includes('SMOKE:EXPECTED_EXCEPTION'),
+            output.includes('ThrowExpected'),
+            !/SMOKE:FAIL|RuntimeError|unreachable|wasm trap/i.test(output),
+          ];
+          failed = !checks.every(Boolean);
+          finish(failed ? 'FAIL' : 'PASS', `EXIT=${code}`);
+        }, 1000);
+      },
+    });
+
+    engine.startGame().catch((error) => {
+      fail('STARTUP', error);
+    });
+  </script>
+</body>
+</html>

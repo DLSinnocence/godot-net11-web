@@ -338,7 +338,7 @@ namespace Godot.Collections
             ThrowIfReadOnly();
 
             var self = (godot_array)NativeValue;
-            return NativeFuncs.godotsharp_array_resize(ref self, newSize);
+            return (Error)NativeFuncs.godotsharp_array_resize(ref self, newSize);
         }
 
         /// <summary>

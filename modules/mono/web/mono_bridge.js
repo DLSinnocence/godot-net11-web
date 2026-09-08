@@ -56,7 +56,7 @@ const Godot = async (moduleConfig) => { // eslint-disable-line no-unused-vars
 			// when multithreading is enabled.
 			jsThreadBlockingMode: 'ThrowWhenBlockingWait',
 		})
-		.withResourceLoader((_type, name, _defaultUri, _integrity, _behavior) => {
+		.withResourceLoader((_type, name, defaultUri, _integrity, _behavior) => {
 			if (name === 'dotnet.native.wasm') {
 				if (preloadedWasm) {
 					// Resource loader allows us to pass a promise with response
@@ -70,7 +70,7 @@ const Godot = async (moduleConfig) => { // eslint-disable-line no-unused-vars
 				return loadPath;
 			}
 			// Use the default path.
-			return null;
+			return defaultUri;
 		});
 
 	await dotnet.download();

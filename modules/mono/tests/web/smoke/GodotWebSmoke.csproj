@@ -1,0 +1,94 @@
+<Project>
+  <PropertyGroup>
+    <RepositoryRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', '..', '..', '..'))</RepositoryRoot>
+    <LocalGodotSdkDir>$([MSBuild]::NormalizeDirectory('$(RepositoryRoot)', 'modules', 'mono', 'editor', 'Godot.NET.Sdk', 'Godot.NET.Sdk', 'Sdk'))</LocalGodotSdkDir>
+    <LocalGodotSharpAssembly>$([MSBuild]::NormalizePath('$(RepositoryRoot)', 'modules', 'mono', 'glue', 'GodotSharp', 'GodotSharp', 'bin', 'Debug', 'GodotSharp.dll'))</LocalGodotSharpAssembly>
+    <LocalGodotSourceGeneratorAssembly>$([MSBuild]::NormalizePath('$(RepositoryRoot)', 'modules', 'mono', 'editor', 'Godot.NET.Sdk', 'Godot.SourceGenerators', 'bin', 'Debug', 'netstandard2.0', 'Godot.SourceGenerators.dll'))</LocalGodotSourceGeneratorAssembly>
+    <LocalGodotSourceFilesDir>$([MSBuild]::NormalizeDirectory('$(RepositoryRoot)', 'modules', 'mono', 'glue', 'GodotSharp', 'GodotSharp', 'SourceFiles'))</LocalGodotSourceFilesDir>
+    <BaseLibGodotPath>$([MSBuild]::NormalizeDirectory('$(RepositoryRoot)', 'bin', '.web_zip', 'libgodot'))</BaseLibGodotPath>
+
+    <TargetFramework>net11.0</TargetFramework>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <SelfContained>true</SelfContained>
+    <StartupObject>GodotPlugins.Game.Initializer</StartupObject>
+    <AssemblyName>GodotWebSmoke</AssemblyName>
+    <RootNamespace>GodotWebSmoke</RootNamespace>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+
+    <Configuration Condition="'$(Configuration)' == ''">ExportDebug</Configuration>
+    <Configurations>ExportDebug;ExportRelease</Configurations>
+    <GodotSdkImportsMicrosoftNetSdk>false</GodotSdkImportsMicrosoftNetSdk>
+    <GodotTargetPlatform>web</GodotTargetPlatform>
+    <GodotProjectDir>$([MSBuild]::EnsureTrailingSlash('$(MSBuildProjectDirectory)'))</GodotProjectDir>
+    <GodotProjectDirBase64>$([MSBuild]::ConvertToBase64('$(GodotProjectDir)'))</GodotProjectDirBase64>
+    <GodotDisableRuntimeMarshalling>true</GodotDisableRuntimeMarshalling>
+    <DisableImplicitGodotSharpReferences>true</DisableImplicitGodotSharpReferences>
+    <DisableImplicitGodotGeneratorReferences>true</DisableImplicitGodotGeneratorReferences>
+    <UseMonoRuntime>false</UseMonoRuntime>
+    <CustomLibGodotPath>$(BaseLibGodotPath)</CustomLibGodotPath>
+    <DefineConstants>GODOT;GODOT4;GODOT4_7;GODOT_WEB;GODOT_WASM;GODOT_JAVASCRIPT;GODOT_HTML5;LIBGODOT_ENABLED</DefineConstants>
+
+    <ArtifactsDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '.artifacts'))</ArtifactsDir>
+    <BaseOutputPath>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'bin'))</BaseOutputPath>
+    <OutputPath>$([MSBuild]::NormalizeDirectory('$(BaseOutputPath)', '$(Configuration)'))</OutputPath>
+    <BaseIntermediateOutputPath>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'obj'))</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$([MSBuild]::NormalizeDirectory('$(BaseIntermediateOutputPath)', '$(Configuration)'))</IntermediateOutputPath>
+    <PublishDir>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'publish', '$(Configuration)'))</PublishDir>
+    <RestorePackagesPath>$([MSBuild]::NormalizeDirectory('$(ArtifactsDir)', 'nuget', 'packages'))</RestorePackagesPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$([MSBuild]::NormalizePath('$(ArtifactsDir)', 'generated', '$(Configuration)'))</CompilerGeneratedFilesOutputPath>
+    <WasmEmitSymbolMap>true</WasmEmitSymbolMap>
+  </PropertyGroup>
+
+  <Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.props" />
+  <Import Project="$(LocalGodotSdkDir)Browser.props" />
+  <Import Project="$([MSBuild]::NormalizePath('$(RepositoryRoot)', 'modules', 'mono', 'editor', 'Godot.NET.Sdk', 'Godot.SourceGenerators', 'Godot.SourceGenerators.props'))" />
+
+  <ItemGroup>
+    <Compile Include="Smoke.cs" />
+    <Compile Include="$(LocalGodotSourceFilesDir)*.cs" Link="SourceFiles\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="GodotSharp">
+      <HintPath>$(LocalGodotSharpAssembly)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Analyzer Include="$(LocalGodotSourceGeneratorAssembly)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Explicit references disable Browser.targets' implicit root, so retain delegate carriers here. -->
+    <TrimmerRootAssembly Include="GodotSharp" />
+  </ItemGroup>
+
+  <Target Name="ValidateLocalSmokeInputs" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(LocalGodotSdkDir)Browser.props')" Text="Local Godot Browser.props is missing: $(LocalGodotSdkDir)Browser.props" />
+    <Error Condition="!Exists('$(LocalGodotSdkDir)Browser.targets')" Text="Local Godot Browser.targets is missing: $(LocalGodotSdkDir)Browser.targets" />
+    <Error Condition="!Exists('$(LocalGodotSharpAssembly)')" Text="Build the local Debug GodotSharp.dll before this fixture: $(LocalGodotSharpAssembly)" />
+    <Error Condition="!Exists('$(LocalGodotSourceGeneratorAssembly)')" Text="Build the local Debug Godot.SourceGenerators.dll before this fixture: $(LocalGodotSourceGeneratorAssembly)" />
+    <Error Condition="!Exists('$(BaseLibGodotPath)libgodot.a')" Text="The local web static template layout is incomplete: $(BaseLibGodotPath)libgodot.a" />
+    <Error Condition="!Exists('$(BaseLibGodotPath)js_library')" Text="The local web static template layout lacks js_library." />
+    <Error Condition="!Exists('$(BaseLibGodotPath)pre_js')" Text="The local web static template layout lacks pre_js." />
+    <Error Condition="!Exists('$(BaseLibGodotPath)post_js')" Text="The local web static template layout lacks post_js." />
+  </Target>
+
+  <Target Name="PrintSmokeConfiguration">
+    <Message Importance="High" Text="Godot SDK targets: $(LocalGodotSdkDir)Sdk.targets" />
+    <Message Importance="High" Text="GodotSharp: $(LocalGodotSharpAssembly)" />
+    <Message Importance="High" Text="Godot.SourceGenerators: $(LocalGodotSourceGeneratorAssembly)" />
+    <Message Importance="High" Text="libgodot layout: $(BaseLibGodotPath)" />
+    <Message Importance="High" Text="WasmBuildNative=$(WasmBuildNative)" />
+    <Message Importance="High" Text="EmccExtraLDFlags=$(EmccExtraLDFlags)" />
+  </Target>
+
+  <Import Sdk="Microsoft.NET.Sdk.WebAssembly" Project="Sdk.targets" />
+  <Import Project="$(LocalGodotSdkDir)Sdk.targets" />
+</Project>

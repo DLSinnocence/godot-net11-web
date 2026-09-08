@@ -9,7 +9,7 @@ To build the Web native library used by a CoreCLR browser-wasm project, enable
 the module and select a static library build:
 
 ```sh
-scons platform=web target=template_release module_mono_enabled=yes library_type=static_library
+scons platform=web target=template_release module_mono_enabled=yes library_type=static_library disable_crash_handler=yes
 ```
 
 1. Build Godot with the module enabled: `module_mono_enabled=yes`.
@@ -24,6 +24,29 @@ scons platform=web target=template_release module_mono_enabled=yes library_type=
 
 The paths specified in these examples assume the command is being run from
 the Godot source root.
+
+## Native interop ABI
+
+The fork uses runtime interop ABI version 1. Struct-return callbacks use an
+explicit trailing output pointer on the native boundary; the generated C#
+methods retain their existing return types. This avoids platform-specific
+aggregate-return differences between native opaque storage and managed fields.
+
+Rebuild the engine, export templates, and GodotSharp packages together after
+updating the interop ABI. Do not mix older engine binaries or templates with the
+new managed assemblies. Initialization checks the callback table size and ABI
+version and rejects mismatched builds before invoking runtime callbacks. The
+version query occupies a fixed first slot with an invariant signature.
+
+The callback generator also emits attributed delegate signatures for the .NET
+Wasm trampoline generator. These describe the lowered native ABI, including
+32-bit native error codes; the public `Godot.Error` enum remains unchanged.
+The browser targets keep GodotSharp rooted so these signatures survive trimming.
+
+Web targets normalize exception handling with `translate-to-exnref` at the final
+emcc link. Build the native library with a compatible Emscripten toolchain, such
+as the one installed by the .NET WebAssembly workload used for that final link.
+Regression checks are documented in `tests/web/README.md`.
 
 # How to deal with NuGet packages
 
