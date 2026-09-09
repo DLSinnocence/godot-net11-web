@@ -119,8 +119,9 @@ namespace GodotPlugins.Game
                 }
                 finally
                 {
-                    // Set CoreCLR shutdown state before the deferred loader exit runs.
-                    Environment.Exit(exitCode);
+                    // Let the loader own clean shutdown; preserve abort behavior for non-zero exits.
+                    if (exitCode != 0)
+                        Environment.Exit(exitCode);
                 }
             }
         }
