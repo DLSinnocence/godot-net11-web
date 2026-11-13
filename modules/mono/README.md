@@ -2,8 +2,9 @@
 
 The editor and desktop projects target .NET 8. Android, iOS, and Web export
 projects target .NET 11 and use the experimental CoreCLR runtime packs (without
-NativeAOT). Install the .NET 8 SDK for editor development; the .NET 11 preview
-SDK is required when building mobile or Web export assemblies.
+NativeAOT). Build the C# solutions with .NET SDK 11.0.100 or a newer stable
+.NET 11 SDK. Keep the .NET 8 SDK installed for the editor's .NET 8 MSBuild
+host. The repository allows .NET 11 SDK updates and excludes prerelease SDKs.
 
 To build the Web native library used by a CoreCLR browser-wasm project, enable
 the module and select a static library build:
@@ -59,7 +60,8 @@ shutdown through Emscripten and `onExit`. Godot does not reset keepalive counter
 or invoke `onExit` itself. Update the Web loader and GodotSharp source package
 together; both sides of this shutdown bridge are required.
 
-The fixed .NET 11 Preview 7 runtime takes an abort path for nonzero exit codes.
+The .NET 11 Preview 7 runtime used during initial validation took an abort
+path for nonzero exit codes.
 The bridge preserves those codes, but does not turn aborts into successful
 `onExit` notifications. The `tests/web/runtime_exit` probe checks normal
 zero-code shutdown against the real runtime, separately from a full game export.

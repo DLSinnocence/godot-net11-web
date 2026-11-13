@@ -6,11 +6,11 @@ $fixture = $PSScriptRoot
 $project = Join-Path $fixture 'GodotWebSmoke.csproj'
 $artifacts = Join-Path $fixture '.artifacts'
 $packages = Join-Path $artifacts 'nuget/packages'
-$expectedSdk = '11.0.100-preview.7.26381.103'
+$sdkConfig = Get-Content -LiteralPath (Join-Path $fixture 'global.json') -Raw | ConvertFrom-Json
 
 $actualSdk = (& dotnet --version).Trim()
-if ($actualSdk -ne $expectedSdk) {
-    throw "Expected .NET SDK $expectedSdk from global.json, got $actualSdk."
+if ($LASTEXITCODE -ne 0 -or $actualSdk -notmatch '^11\.0\.\d+$' -or [version]$actualSdk -lt [version]$sdkConfig.sdk.version) {
+    throw "Expected a stable .NET 11 SDK >= $($sdkConfig.sdk.version) from global.json, got $actualSdk."
 }
 
 New-Item -ItemType Directory -Force -Path $packages | Out-Null

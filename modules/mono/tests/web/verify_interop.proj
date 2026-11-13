@@ -5,10 +5,10 @@
   </PropertyGroup>
 
   <UsingTask TaskName="Microsoft.WebAssembly.Build.Tasks.CoreClr.ManagedToNativeGenerator"
-    AssemblyFile="$(WasmSdkDir)/tasks/net11.0/WasmAppBuilder.dll" />
+    AssemblyFile="$(WasmSdkDir)/tasks/net/WasmAppBuilder.dll" />
 
   <Target Name="Verify">
-    <Error Condition="!Exists('$(WasmSdkDir)/tasks/net11.0/WasmAppBuilder.dll')"
+    <Error Condition="!Exists('$(WasmSdkDir)/tasks/net/WasmAppBuilder.dll')"
       Text="Pass WasmSdkDir pointing to the installed .NET 11 WebAssembly SDK pack." />
     <Error Condition="!Exists('$(WasmRuntimeDir)/native/System.Private.CoreLib.dll') and !Exists('$(WasmRuntimeDir)/lib/net11.0/System.Private.CoreLib.dll')"
       Text="Pass WasmRuntimeDir pointing to runtimes/browser-wasm in the CoreCLR runtime pack." />

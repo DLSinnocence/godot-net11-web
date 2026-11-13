@@ -43,6 +43,6 @@ matched set. Compile-only and mocked tests do not substitute for exporting and
 loading a real browser game, reloading it, and checking shutdown diagnostics.
 
 The `smoke/` fixture covers these browser scenarios. Its README records the
-current native-publish blockers separately from the passing managed build and
-call-helper generation checks. It must not be counted as a passing browser test
-until native publish and both browser runs complete.
+passing .NET 11 GA managed build and call-helper generation checks, plus the
+historical Preview 7 native-publish failures. It must not be counted as a passing
+browser test until native publish and both browser runs complete.

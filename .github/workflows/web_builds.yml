@@ -76,7 +76,7 @@ jobs:
         if: contains(matrix.scons-flags, 'module_mono_enabled=yes')
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 11.0.100-preview.7.26381.103
+          dotnet-version: 11.0.x
 
       - name: Install .NET WebAssembly tools
         if: contains(matrix.scons-flags, 'module_mono_enabled=yes')

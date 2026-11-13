@@ -12,8 +12,7 @@ From this directory:
 ```
 
 Preparation uses `dotnet build -c Release -r browser-wasm
--p:WasmBuildNative=false -o .artifacts/www/_framework`, not `publish`, to avoid
-the installed SDK's missing `_WasmBuildAppCore` target. It uses the prebuilt
+-p:WasmBuildNative=false -o .artifacts/www/_framework`. It uses the prebuilt
 runtime without native relinking or SDK modifications. The project compiles
 only `Program.cs`; intermediates, output, logs, and Playwright artifacts stay
 under `.artifacts/`.

@@ -8,7 +8,7 @@ All restore, build, publish, generated-source, pack, and browser outputs stay un
 
 ## Managed preparation
 
-This pins .NET SDK `11.0.100-preview.7.26381.103`, restores into `.artifacts/nuget/packages`, and forces `WasmBuildNative=false` so no emcc link starts:
+This requires .NET SDK `11.0.100` or a newer stable .NET 11 SDK (`rollForward: latestFeature`, prerelease SDKs excluded), restores into `.artifacts/nuget/packages`, and forces `WasmBuildNative=false` so no emcc link starts:
 
 ```powershell
 ./prepare-managed.ps1
@@ -32,6 +32,10 @@ The publish uses `bin/.web_zip/libgodot/libgodot.a` plus `js_library`, `pre_js`,
 
 The runner uses the existing Playwright CLI package in offline mode via `npx.cmd`, polls the harness status with `eval`, checks a full load and reload, and attempts to close its Playwright session and stop its local Node server even on failure. The harness waits one second after `onExit` before checking success so queued shutdown errors can surface. Page errors and unhandled promise rejections make failure sticky, including errors received after that check; the finite wait is not a guarantee against arbitrarily late errors.
 
-## Validation status (September 8, 2026)
+## Validation status (.NET 11 GA)
+
+Managed preparation and the CoreCLR managed-to-native ABI generation check pass with .NET SDK `11.0.100` and `wasm-tools` workload set `11.0.100.1`. The browser runtime pack resolves to `11.0.0`. Full native publish and browser load/reload have not been rerun with this toolchain.
+
+## Historical Preview 7 validation (September 8, 2026)
 
 Normal native publish is blocked by the missing `_WasmBuildAppCore` target referenced by the installed Preview 7 `WasmNestedPublishAppDependsOn`. A diagnostic CLI override, `-p:WasmNestedPublishAppDependsOn=`, gets past that blocker and reaches generated bridge C++ compilation, but the installed `BrowserWasmApp.CoreCLR.targets` then requires the nonexistent `Sdk/coreclr_compat.h`. `WASM0067` no longer occurs in that diagnostic path; no final Wasm or browser load/reload run has been validated. The override is diagnostic only, not a supported publish fix; do not add fake targets or headers to bypass these blockers.

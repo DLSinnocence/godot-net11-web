@@ -55,7 +55,7 @@ jobs:
         if: matrix.build-mono
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 11.0.100-preview.7.26381.103
+          dotnet-version: 11.0.x
 
       - name: Download pre-built ANGLE
         shell: sh
